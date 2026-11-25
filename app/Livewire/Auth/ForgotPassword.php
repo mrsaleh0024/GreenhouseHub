@@ -2,10 +2,15 @@
 
 namespace App\Livewire\Auth;
 
+use App\Enums\OtpPurpose;
+use App\Exceptions\OtpSendException;
+use App\Livewire\Concerns\HasFarsiValidation;
 use App\Models\User;
 use App\Services\OtpService;
-use App\Services\SmsService;
+use App\Support\Mobile;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -13,60 +18,96 @@ use Livewire\Component;
 #[Title('فراموشی رمز عبور')]
 class ForgotPassword extends Component
 {
+    use HasFarsiValidation;
+
+    #[Locked]
+    public string $step = 'mobile';
+
+    #[Locked]
+    public string $confirmedMobile = '';
+
     public string $mobile = '';
-    public string $otp = '';
-    public bool $otpSent = false;
+    public string $code = '';
 
-    public function sendOtp()
+    public function sendCode(OtpService $otp): void
     {
-        $this->validate([
-            'mobile' => ['required', 'regex:/^09\d{9}$/'],
-        ], [
-            'mobile.required' => 'شماره موبایل الزامی است.',
-            'mobile.regex' => 'شماره موبایل معتبر نیست.',
-        ]);
+        $this->mobile = Mobile::normalize($this->mobile);
+        $this->validate(['mobile' => ['required', 'regex:/^09\d{9}$/']]);
 
-        $user = User::where('mobile', $this->mobile)->first();
+        $ipKey = 'forgot:'.request()->ip();
 
-        if (!$user) {
-            $this->addError('mobile', 'کاربری با این شماره موبایل یافت نشد.');
+        if (RateLimiter::tooManyAttempts($ipKey, 15)) {
+            $this->addError('mobile', 'تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.');
+
             return;
         }
 
-        $otpService = app(OtpService::class);
-        $smsService = app(SmsService::class);
+        RateLimiter::hit($ipKey, 3600);
 
-        if (!$otpService->canSend($this->mobile)) {
-            $this->addError('mobile', 'تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد تلاش کنید.');
-            return;
+        // Always move to the code step: the response never reveals whether the number is registered.
+        if ($this->eligibleUser($this->mobile)) {
+            try {
+                $otp->send($this->mobile, OtpPurpose::PasswordReset);
+            } catch (OtpSendException $e) {
+                $this->addError('mobile', $e->getMessage());
+
+                return;
+            }
         }
 
-        $otp = $otpService->generate($this->mobile);
-        $smsService->sendOtp($this->mobile, $otp);
-        $otpService->incrementSendCount($this->mobile);
-
-        $this->otpSent = true;
-        session(['reset_mobile' => $this->mobile]);
+        $this->confirmedMobile = $this->mobile;
+        $this->step = 'code';
     }
 
-    public function verifyOtp()
+    public function verifyCode(OtpService $otp): void
     {
-        $this->validate([
-            'otp' => ['required', 'digits:6'],
-        ]);
+        $this->code = Mobile::latinDigits($this->code);
+        $this->validate(['code' => ['required', 'digits:'.OtpService::LENGTH]]);
 
-        $otpService = app(OtpService::class);
+        if (! $otp->verify($this->confirmedMobile, OtpPurpose::PasswordReset, $this->code)) {
+            $this->code = '';
+            $this->addError('code', 'کد وارد شده اشتباه یا منقضی شده است.');
 
-        if (!$otpService->verify($this->mobile, $this->otp)) {
-            $this->addError('otp', 'کد وارد شده اشتباه یا منقضی شده است.');
             return;
         }
 
-        return redirect()->route('password.reset');
+        $otp->markVerified($this->confirmedMobile, OtpPurpose::PasswordReset);
+        session()->put('reset_mobile', $this->confirmedMobile);
+
+        $this->redirect(route('password.reset'), navigate: false);
+    }
+
+    public function resend(OtpService $otp): void
+    {
+        if (! $this->eligibleUser($this->confirmedMobile)) {
+            return;
+        }
+
+        try {
+            $otp->send($this->confirmedMobile, OtpPurpose::PasswordReset);
+        } catch (OtpSendException $e) {
+            $this->addError('code', $e->getMessage());
+
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->dispatch('otp-sent', seconds: OtpService::RESEND_COOLDOWN_SECONDS);
+    }
+
+    private function eligibleUser(string $mobile): ?User
+    {
+        $user = User::where('mobile', $mobile)->first();
+
+        return $user && $user->isActive() && $user->hasPassword() ? $user : null;
     }
 
     public function render()
     {
-        return view('livewire.auth.forgot-password');
+        return view('livewire.auth.forgot-password', [
+            'resendIn' => $this->confirmedMobile
+                ? app(OtpService::class)->secondsUntilResend($this->confirmedMobile, OtpPurpose::PasswordReset)
+                : 0,
+        ]);
     }
 }

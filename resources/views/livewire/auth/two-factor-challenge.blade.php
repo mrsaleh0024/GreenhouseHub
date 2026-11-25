@@ -1,0 +1,30 @@
+<div>
+    <h1 class="mb-1 text-center text-xl font-bold text-gray-800">تأیید دومرحله‌ای</h1>
+    <p class="mb-6 text-center text-sm text-gray-500">
+        برای ورود، کد ارسال‌شده به شماره
+        <span dir="ltr" class="font-medium text-gray-700">{{ $maskedMobile }}</span> را وارد کنید.
+    </p>
+
+    @if (session('otp_error'))
+        <x-auth.alert type="error">{{ session('otp_error') }}</x-auth.alert>
+    @endif
+
+    <form wire:submit="verify" class="space-y-4">
+        <x-auth.input label="کد تأیید" name="code" wire:model="code" ltr inputmode="numeric"
+                      autocomplete="one-time-code" maxlength="6" placeholder="------"
+                      class="text-center text-lg tracking-[0.5em]" autofocus />
+
+        <x-auth.button target="verify">
+            <span wire:loading.remove wire:target="verify">ورود</span>
+            <span wire:loading wire:target="verify">در حال بررسی...</span>
+        </x-auth.button>
+    </form>
+
+    <div class="mt-4">
+        <x-otp-resend :seconds="$resendIn" />
+    </div>
+
+    <p class="mt-6 border-t border-gray-100 pt-4 text-center text-sm">
+        <button type="button" wire:click="cancel" class="text-gray-600 hover:underline">انصراف و بازگشت به ورود</button>
+    </p>
+</div>

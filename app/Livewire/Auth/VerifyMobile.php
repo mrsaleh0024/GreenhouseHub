@@ -2,118 +2,112 @@
 
 namespace App\Livewire\Auth;
 
+use App\Enums\OtpPurpose;
+use App\Enums\UserStatus;
+use App\Exceptions\OtpSendException;
+use App\Livewire\Concerns\HasFarsiValidation;
 use App\Models\User;
 use App\Services\OtpService;
-use App\Services\SmsService;
+use App\Support\Mobile;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
+/**
+ * Confirms the mobile of a self-registered account (password already set).
+ * Reached only through Register or Login, which put `pending_mobile` in the session.
+ */
 #[Layout('layouts.guest')]
 #[Title('تأیید شماره موبایل')]
 class VerifyMobile extends Component
 {
+    use HasFarsiValidation;
+
+    #[Locked]
     public string $mobile = '';
-    public string $otp = '';
-    public string $password = '';
-    public string $password_confirmation = '';
 
-    public bool $otpSent = false;
-    public bool $otpVerified = false;
+    public string $code = '';
 
-    public function mount()
+    public function mount(): void
     {
-        $this->mobile = session('pending_mobile', '');
+        $mobile = session('pending_mobile');
 
-        if (empty($this->mobile)) {
-            return redirect()->route('login');
-        }
-    }
+        if (! is_string($mobile) || ! Mobile::isValid($mobile)) {
+            $this->redirect(route('login'), navigate: false);
 
-    public function sendOtp()
-    {
-        $this->validate([
-            'mobile' => ['required', 'regex:/^09\d{9}$/'],
-        ]);
-
-        $otpService = app(OtpService::class);
-        $smsService = app(SmsService::class);
-
-        if (!$otpService->canSend($this->mobile)) {
-            $this->addError('mobile', 'تعداد درخواست‌های شما بیش از حد مجاز است. کمی بعد تلاش کنید.');
             return;
         }
 
-        $otp = $otpService->generate($this->mobile);
-        $smsService->sendOtp($this->mobile, $otp);
-        $otpService->incrementSendCount($this->mobile);
-
-        $this->otpSent = true;
-        $this->dispatch('otp-sent');
+        $this->mobile = $mobile;
     }
 
-    public function verifyOtp()
+    public function verify(OtpService $otp): void
     {
-        $this->validate([
-            'otp' => ['required', 'digits:6'],
-        ]);
+        $this->code = Mobile::latinDigits($this->code);
+        $this->validate(['code' => ['required', 'digits:'.OtpService::LENGTH]]);
 
-        $otpService = app(OtpService::class);
+        if (session('pending_mobile') !== $this->mobile) {
+            $this->redirect(route('login'), navigate: false);
 
-        if (!$otpService->verify($this->mobile, $this->otp)) {
-            $this->addError('otp', 'کد وارد شده اشتباه یا منقضی شده است.');
             return;
         }
 
-        $this->otpVerified = true;
-    }
+        if (! $otp->verify($this->mobile, OtpPurpose::Registration, $this->code)) {
+            $this->code = '';
+            $this->addError('code', 'کد وارد شده اشتباه یا منقضی شده است.');
 
-    public function setPassword()
-    {
-        $this->validate([
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ], [
-            'password.required' => 'رمز عبور الزامی است.',
-            'password.min' => 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
-            'password.confirmed' => 'تکرار رمز عبور مطابقت ندارد.',
-        ]);
+            return;
+        }
 
         $user = User::where('mobile', $this->mobile)->first();
 
-        if (!$user) {
-            $this->addError('mobile', 'کاربر یافت نشد.');
+        if (! $user || $user->status === UserStatus::Inactive) {
+            session()->forget('pending_mobile');
+            $this->redirect(route('login'), navigate: false);
+
             return;
         }
 
-        $user->update([
-            'password' => Hash::make($this->password),
-            'mobile_verified_at' => now(),
-            'status' => 'active',
-        ]);
+        $user->activate();
+        session()->forget('pending_mobile');
+
+        // Admin-level accounts still have to pass the 2FA step at login.
+        if ($user->requiresTwoFactor()) {
+            session()->flash('status', 'حساب شما فعال شد. لطفاً وارد شوید.');
+            $this->redirect(route('login'), navigate: false);
+
+            return;
+        }
 
         Auth::login($user);
-        session()->forget('pending_mobile');
         session()->regenerate();
 
-        if ($user->hasRole(['super_admin', 'admin'])) {
-            return redirect()->intended('/admin');
+        $this->redirectIntended(default: route('dashboard'), navigate: false);
+    }
+
+    public function resend(OtpService $otp): void
+    {
+        try {
+            $otp->send($this->mobile, OtpPurpose::Registration);
+        } catch (OtpSendException $e) {
+            $this->addError('code', $e->getMessage());
+
+            return;
         }
 
-        if ($user->hasRole('expert')) {
-            return redirect()->intended('/expert');
-        }
-
-        if ($user->hasRole('greenhouse_owner')) {
-            return redirect()->intended('/owner');
-        }
-
-        return redirect()->intended('/member');
+        $this->resetErrorBag();
+        $this->dispatch('otp-sent', seconds: OtpService::RESEND_COOLDOWN_SECONDS);
     }
 
     public function render()
     {
-        return view('livewire.auth.verify-mobile');
+        return view('livewire.auth.verify-mobile', [
+            'maskedMobile' => Mobile::mask($this->mobile),
+            'resendIn' => $this->mobile
+                ? app(OtpService::class)->secondsUntilResend($this->mobile, OtpPurpose::Registration)
+                : 0,
+        ]);
     }
 }

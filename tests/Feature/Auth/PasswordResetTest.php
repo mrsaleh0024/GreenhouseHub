@@ -2,83 +2,118 @@
 
 namespace Tests\Feature\Auth;
 
-use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Enums\Role;
+use App\Livewire\Auth\ForgotPassword;
+use App\Livewire\Auth\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Notification;
-use Livewire\Volt\Volt;
+use Illuminate\Support\Facades\Hash;
+use Livewire\Livewire;
+use Tests\Concerns\InteractsWithAuth;
 use Tests\TestCase;
 
 class PasswordResetTest extends TestCase
 {
+    use InteractsWithAuth;
     use RefreshDatabase;
 
-    public function test_reset_password_link_screen_can_be_rendered(): void
+    protected function setUp(): void
     {
-        $response = $this->get('/forgot-password');
-
-        $response
-            ->assertSeeVolt('pages.auth.forgot-password')
-            ->assertStatus(200);
+        parent::setUp();
+        $this->setUpAuth();
     }
 
-    public function test_reset_password_link_can_be_requested(): void
+    public function test_password_can_be_reset_with_an_sms_code(): void
     {
-        Notification::fake();
+        $user = $this->userWithRole(Role::Expert);
 
-        $user = User::factory()->create();
+        Livewire::test(ForgotPassword::class)
+            ->set('mobile', $user->mobile)
+            ->call('sendCode')
+            ->assertSet('step', 'code')
+            ->set('code', $this->sms->lastCode($user->mobile))
+            ->call('verifyCode')
+            ->assertRedirect(route('password.reset'));
 
-        Volt::test('pages.auth.forgot-password')
-            ->set('email', $user->email)
-            ->call('sendPasswordResetLink');
+        Livewire::test(ResetPassword::class)
+            ->set('password', 'NewPassword2')
+            ->set('password_confirmation', 'NewPassword2')
+            ->call('resetPassword')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('login'));
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        $this->assertTrue(Hash::check('NewPassword2', $user->fresh()->password));
+        $this->assertGuest();
     }
 
-    public function test_reset_password_screen_can_be_rendered(): void
+    public function test_resetting_an_admin_password_does_not_log_them_in(): void
     {
-        Notification::fake();
+        $admin = $this->userWithRole(Role::Admin);
 
-        $user = User::factory()->create();
+        Livewire::test(ForgotPassword::class)
+            ->set('mobile', $admin->mobile)
+            ->call('sendCode')
+            ->set('code', $this->sms->lastCode($admin->mobile))
+            ->call('verifyCode');
 
-        Volt::test('pages.auth.forgot-password')
-            ->set('email', $user->email)
-            ->call('sendPasswordResetLink');
+        Livewire::test(ResetPassword::class)
+            ->set('password', 'NewPassword2')
+            ->set('password_confirmation', 'NewPassword2')
+            ->call('resetPassword');
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-            $response = $this->get('/reset-password/'.$notification->token);
-
-            $response
-                ->assertSeeVolt('pages.auth.reset-password')
-                ->assertStatus(200);
-
-            return true;
-        });
+        $this->assertGuest();
     }
 
-    public function test_password_can_be_reset_with_valid_token(): void
+    public function test_the_reset_page_requires_a_verified_code(): void
     {
-        Notification::fake();
+        $this->get(route('password.reset'))->assertRedirect(route('password.request'));
+    }
 
-        $user = User::factory()->create();
+    public function test_a_wrong_code_does_not_unlock_the_reset_page(): void
+    {
+        $user = $this->userWithRole(Role::Expert);
 
-        Volt::test('pages.auth.forgot-password')
-            ->set('email', $user->email)
-            ->call('sendPasswordResetLink');
+        $component = Livewire::test(ForgotPassword::class)
+            ->set('mobile', $user->mobile)
+            ->call('sendCode');
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
-            $component = Volt::test('pages.auth.reset-password', ['token' => $notification->token])
-                ->set('email', $user->email)
-                ->set('password', 'password')
-                ->set('password_confirmation', 'password');
+        $real = $this->sms->lastCode($user->mobile);
 
-            $component->call('resetPassword');
+        $component
+            ->set('code', $real === '000000' ? '111111' : '000000')
+            ->call('verifyCode')
+            ->assertHasErrors('code')
+            ->assertNoRedirect();
 
-            $component
-                ->assertRedirect('/login')
-                ->assertHasNoErrors();
+        $this->get(route('password.reset'))->assertRedirect(route('password.request'));
+    }
 
-            return true;
-        });
+    public function test_unknown_mobile_gets_the_same_response_but_no_sms(): void
+    {
+        Livewire::test(ForgotPassword::class)
+            ->set('mobile', '09129999999')
+            ->call('sendCode')
+            ->assertHasNoErrors()
+            ->assertSet('step', 'code');
+
+        $this->assertSame([], $this->sms->codes);
+    }
+
+    public function test_the_new_password_must_be_strong_and_confirmed(): void
+    {
+        $user = $this->userWithRole(Role::Expert);
+
+        Livewire::test(ForgotPassword::class)
+            ->set('mobile', $user->mobile)
+            ->call('sendCode')
+            ->set('code', $this->sms->lastCode($user->mobile))
+            ->call('verifyCode');
+
+        Livewire::test(ResetPassword::class)
+            ->set('password', 'weak')
+            ->set('password_confirmation', 'weak')
+            ->call('resetPassword')
+            ->assertHasErrors('password');
+
+        $this->assertTrue(Hash::check('Password1', $user->fresh()->password));
     }
 }

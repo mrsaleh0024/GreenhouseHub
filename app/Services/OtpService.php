@@ -2,73 +2,194 @@
 
 namespace App\Services;
 
+use App\Enums\OtpPurpose;
+use App\Exceptions\OtpSendException;
+use App\Services\Sms\SmsGateway;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\RateLimiter;
+use Throwable;
 
 class OtpService
 {
-    const OTP_LENGTH = 6;
-    const OTP_EXPIRY_SECONDS = 120;
-    const MAX_ATTEMPTS = 5;
-    const MAX_SEND_PER_HOUR = 8;
+    public const LENGTH = 6;
+    public const EXPIRY_SECONDS = 120;
+    public const MAX_VERIFY_ATTEMPTS = 5;
+    public const RESEND_COOLDOWN_SECONDS = 60;
+    public const MAX_SENDS_PER_MOBILE_PER_HOUR = 8;
+    public const MAX_SENDS_PER_IP_PER_HOUR = 30;
+    public const VERIFIED_TTL_SECONDS = 600;
 
-    public function generate(string $mobile): string
+    public function __construct(private readonly SmsGateway $sms)
     {
-        $otp = str_pad(random_int(0, 999999), self::OTP_LENGTH, '0', STR_PAD_LEFT);
+    }
 
-        $key = $this->getCacheKey($mobile);
+    /**
+     * Generate and send a code. Only a keyed hash of the code is stored.
+     *
+     * @throws OtpSendException when throttled or when delivery fails
+     */
+    public function send(string $mobile, OtpPurpose $purpose): void
+    {
+        $this->ensureCanSend($mobile, $purpose);
 
-        Cache::put($key, [
-            'code' => $otp,
+        $code = str_pad((string) random_int(0, (10 ** self::LENGTH) - 1), self::LENGTH, '0', STR_PAD_LEFT);
+        $codeKey = $this->codeKey($mobile, $purpose);
+
+        Cache::put($codeKey, [
+            'hash' => $this->hash($mobile, $purpose, $code),
             'attempts' => 0,
-            'created_at' => now(),
-        ], self::OTP_EXPIRY_SECONDS);
+            'expires_at' => now()->getTimestamp() + self::EXPIRY_SECONDS,
+        ], self::EXPIRY_SECONDS);
 
-        return $otp;
+        try {
+            $this->sms->sendOtp($mobile, $code);
+        } catch (Throwable $e) {
+            Cache::forget($codeKey);
+            report($e);
+
+            throw new OtpSendException('ارسال پیامک با خطا مواجه شد. کمی بعد دوباره تلاش کنید.', 30);
+        }
+
+        RateLimiter::hit($this->cooldownKey($mobile, $purpose), self::RESEND_COOLDOWN_SECONDS);
+        RateLimiter::hit($this->mobileKey($mobile), 3600);
+        RateLimiter::hit($this->ipKey(), 3600);
     }
 
-    public function verify(string $mobile, string $inputCode): bool
+    /**
+     * Check a code. Wrong guesses are counted without extending the expiry;
+     * after MAX_VERIFY_ATTEMPTS the code is destroyed. A code works only once.
+     */
+    public function verify(string $mobile, OtpPurpose $purpose, string $code): bool
     {
-        $key = $this->getCacheKey($mobile);
-        $data = Cache::get($key);
+        $key = $this->codeKey($mobile, $purpose);
 
-        if (!$data) {
+        try {
+            return Cache::lock($key.':lock', 5)->block(3, function () use ($key, $mobile, $purpose, $code): bool {
+                $data = Cache::get($key);
+
+                if (! is_array($data)) {
+                    return false;
+                }
+
+                if (hash_equals($data['hash'], $this->hash($mobile, $purpose, $code))) {
+                    Cache::forget($key);
+
+                    return true;
+                }
+
+                $attempts = ($data['attempts'] ?? 0) + 1;
+
+                if ($attempts >= self::MAX_VERIFY_ATTEMPTS) {
+                    Cache::forget($key);
+
+                    return false;
+                }
+
+                $data['attempts'] = $attempts;
+                Cache::put($key, $data, max(1, $data['expires_at'] - now()->getTimestamp()));
+
+                return false;
+            });
+        } catch (LockTimeoutException) {
             return false;
         }
+    }
 
-        $data['attempts']++;
-        Cache::put($key, $data, self::OTP_EXPIRY_SECONDS);
+    public function secondsUntilResend(string $mobile, OtpPurpose $purpose): int
+    {
+        $key = $this->cooldownKey($mobile, $purpose);
 
-        if ($data['attempts'] > self::MAX_ATTEMPTS) {
-            Cache::forget($key);
-            return false;
+        return RateLimiter::tooManyAttempts($key, 1) ? RateLimiter::availableIn($key) : 0;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | "OTP passed" marker, stored server-side in the session.
+    |--------------------------------------------------------------------------
+    | Steps that follow a successful OTP (set password, reset password) must
+    | call consumeVerified(); a client-side flag alone is never trusted.
+    */
+
+    public function markVerified(string $mobile, OtpPurpose $purpose): void
+    {
+        session()->put($this->verifiedKey($purpose), [
+            'mobile' => $mobile,
+            'expires_at' => now()->getTimestamp() + self::VERIFIED_TTL_SECONDS,
+        ]);
+    }
+
+    public function isVerified(string $mobile, OtpPurpose $purpose): bool
+    {
+        $marker = session()->get($this->verifiedKey($purpose));
+
+        return is_array($marker)
+            && ($marker['mobile'] ?? null) === $mobile
+            && ($marker['expires_at'] ?? 0) >= now()->getTimestamp();
+    }
+
+    /** One-time check: returns true at most once per successful OTP. */
+    public function consumeVerified(string $mobile, OtpPurpose $purpose): bool
+    {
+        $ok = $this->isVerified($mobile, $purpose);
+
+        session()->forget($this->verifiedKey($purpose));
+
+        return $ok;
+    }
+
+    private function ensureCanSend(string $mobile, OtpPurpose $purpose): void
+    {
+        $cooldown = $this->cooldownKey($mobile, $purpose);
+
+        if (RateLimiter::tooManyAttempts($cooldown, 1)) {
+            $seconds = RateLimiter::availableIn($cooldown);
+
+            throw new OtpSendException("برای دریافت کد جدید {$seconds} ثانیه صبر کنید.", $seconds);
         }
 
-        if ($data['code'] === $inputCode) {
-            Cache::forget($key);
-            return true;
+        $limits = [
+            $this->mobileKey($mobile) => self::MAX_SENDS_PER_MOBILE_PER_HOUR,
+            $this->ipKey() => self::MAX_SENDS_PER_IP_PER_HOUR,
+        ];
+
+        foreach ($limits as $key => $max) {
+            if (RateLimiter::tooManyAttempts($key, $max)) {
+                throw new OtpSendException(
+                    'تعداد درخواست‌های ارسال کد بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.',
+                    RateLimiter::availableIn($key),
+                );
+            }
         }
-
-        return false;
     }
 
-    public function canSend(string $mobile): bool
+    private function hash(string $mobile, OtpPurpose $purpose, string $code): string
     {
-        $sendKey = "otp_send_count:{$mobile}";
-        $count = Cache::get($sendKey, 0);
-
-        return $count < self::MAX_SEND_PER_HOUR;
+        return hash_hmac('sha256', $purpose->value.'|'.$mobile.'|'.$code, (string) config('app.key'));
     }
 
-    public function incrementSendCount(string $mobile): void
+    private function codeKey(string $mobile, OtpPurpose $purpose): string
     {
-        $sendKey = "otp_send_count:{$mobile}";
-        $count = Cache::get($sendKey, 0);
-        Cache::put($sendKey, $count + 1, now()->addHour());
+        return "otp:code:{$purpose->value}:{$mobile}";
     }
 
-    private function getCacheKey(string $mobile): string
+    private function cooldownKey(string $mobile, OtpPurpose $purpose): string
     {
-        return "otp:{$mobile}";
+        return "otp:cooldown:{$purpose->value}:{$mobile}";
+    }
+
+    private function mobileKey(string $mobile): string
+    {
+        return "otp:sends:mobile:{$mobile}";
+    }
+
+    private function ipKey(): string
+    {
+        return 'otp:sends:ip:'.request()->ip();
+    }
+
+    private function verifiedKey(OtpPurpose $purpose): string
+    {
+        return "otp_verified_{$purpose->value}";
     }
 }
