@@ -24,6 +24,21 @@
                 <div role="status" class="mb-6 rounded-xl bg-green-50 px-4 py-3 text-sm leading-6 text-green-800">اطلاعات بخش قبل ذخیره شد.</div>
             @endif
             @if ($customNotice)<div role="status" class="mb-6 rounded-xl bg-green-50 px-4 py-3 text-sm leading-6 text-green-800">{{ $customNotice }}</div>@endif
+            @if (auth()->user()->hasRole('greenhouse_owner') && $step === 1)
+                <div class="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-7 text-gray-700">
+                    <p>برای اصلاح شماره تماس ثبت‌نام، مالکیت یا استان و شهر، درخواست خود را برای مدیر بفرستید.</p>
+                    <button type="button" wire:click="$toggle('showCorrection')" class="mt-2 font-semibold text-green-700 hover:underline">{{ $showCorrection ? 'بستن فرم درخواست' : 'درخواست اصلاح اطلاعات کلیدی' }}</button>
+                    @if ($showCorrection)
+                        <label for="key-correction" class="mt-4 block font-semibold">توضیح درخواست</label>
+                        <textarea id="key-correction" wire:model="correctionDetails" rows="3" maxlength="2000" class="mt-2 w-full rounded-xl border-gray-300 text-sm focus:border-green-600 focus:ring-green-600"></textarea>
+                        @error('correctionDetails')<p role="alert" class="mt-2 text-red-700">{{ $message }}</p>@enderror
+                        <button type="button" wire:click="requestCorrection" wire:loading.attr="disabled" wire:target="requestCorrection" class="mt-3 rounded-lg bg-green-700 px-4 py-2 font-semibold text-white disabled:opacity-60">ارسال درخواست</button>
+                    @endif
+                    @foreach ($corrections as $correction)
+                        <div class="mt-4 border-t border-gray-200 pt-3"><p class="font-semibold">{{ $correction->status === 'pending' ? 'در انتظار بررسی' : 'بررسی‌شده' }}</p><p class="whitespace-pre-wrap">{{ $correction->details }}</p>@if ($correction->resolution)<p>پاسخ مدیر: {{ $correction->resolution }}</p>@endif</div>
+                    @endforeach
+                </div>
+            @endif
             @if ($errors->any())
                 <div role="alert" class="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">برخی اطلاعات نیاز به بررسی دارند. پیام کنار هر بخش را ببینید.</div>
             @endif

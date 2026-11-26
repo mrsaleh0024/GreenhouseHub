@@ -3,7 +3,10 @@
 namespace App\Livewire\Greenhouse;
 
 use App\Models\CatalogItem;
+use App\Models\CorrectionRequest;
 use App\Models\Greenhouse;
+use App\Enums\Role;
+use App\Services\CorrectionRequestService;
 use App\Services\CatalogService;
 use App\Services\CatalogVisibility;
 use App\Services\GreenhouseRecordService;
@@ -54,6 +57,24 @@ class RecordWizard extends Component
     public array $customLabels = [];
 
     public string $customNotice = '';
+
+    public string $correctionDetails = '';
+
+    public bool $showCorrection = false;
+
+    public function requestCorrection(CorrectionRequestService $service): void
+    {
+        $this->resetErrorBag();
+        try {
+            $service->request(auth()->user(), $this->record(), $this->correctionDetails);
+        } catch (ValidationException $exception) {
+            $this->addError('correctionDetails', collect($exception->errors())->flatten()->first());
+            return;
+        }
+        $this->correctionDetails = '';
+        $this->showCorrection = false;
+        $this->customNotice = 'درخواست اصلاح برای بررسی مدیر ثبت شد.';
+    }
 
     public function mount(Greenhouse $greenhouse): void
     {
@@ -164,6 +185,10 @@ class RecordWizard extends Component
         CatalogVisibility::constrain($query, auth()->user(), $attached);
         $catalog = $query->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->get()->groupBy('type');
 
-        return view('livewire.greenhouse.record-wizard', ['greenhouse' => $greenhouse, 'catalog' => $catalog]);
+        $corrections = auth()->user()->hasRole(Role::GreenhouseOwner->value)
+            ? CorrectionRequest::where('greenhouse_id', $greenhouse->id)->whereNull('cultivation_cycle_id')->where('requested_by', auth()->id())->latest()->limit(10)->get()
+            : collect();
+
+        return view('livewire.greenhouse.record-wizard', ['greenhouse' => $greenhouse, 'catalog' => $catalog, 'corrections' => $corrections]);
     }
 }

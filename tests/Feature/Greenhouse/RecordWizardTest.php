@@ -18,6 +18,21 @@ class RecordWizardTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_owner_can_request_a_key_information_correction(): void
+    {
+        $this->withoutVite();
+        $this->seed(RoleSeeder::class);
+        $owner = User::factory()->role(Role::GreenhouseOwner)->create();
+        $customer = Customer::create(['full_name' => 'مشتری', 'mobile' => '09123456789']);
+        $customer->users()->attach($owner);
+        $greenhouse = Greenhouse::create(['customer_id' => $customer->id, 'name' => 'گلخانه']);
+
+        Livewire::actingAs($owner)->test(RecordWizard::class, ['greenhouse' => $greenhouse])
+            ->set('correctionDetails', 'لطفاً شهر پرونده را اصلاح کنید')
+            ->call('requestCorrection')->assertHasNoErrors()->assertSee('در انتظار بررسی');
+        $this->assertDatabaseHas('correction_requests', ['greenhouse_id' => $greenhouse->id, 'requested_by' => $owner->id, 'cultivation_cycle_id' => null]);
+    }
+
     public function test_owner_saves_each_step_and_can_resume(): void
     {
         $this->withoutVite();
