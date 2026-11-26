@@ -19,6 +19,28 @@ class CultivationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_selected_substrate_opens_relevant_fields_and_saves_their_context(): void
+    {
+        $this->withoutVite();
+        $this->seed([RoleSeeder::class, CatalogSeeder::class]);
+        $owner = User::factory()->role(Role::GreenhouseOwner)->create();
+        $customer = Customer::create(['full_name' => 'مشتری', 'mobile' => '09123456789']);
+        $customer->users()->attach($owner);
+        $greenhouse = Greenhouse::create(['customer_id' => $customer->id, 'name' => 'گلخانه']);
+        $crop = CatalogItem::where('type', 'crop')->firstOrFail();
+        $water = CatalogItem::where('type', 'substrate')->where('slug', 'water')->firstOrFail();
+        Livewire::actingAs($owner)->test(Cultivation::class, ['greenhouse' => $greenhouse])->call('startNew')
+            ->assertSee('custom-substrate', false)
+            ->set('crop_id', (string) $crop->id)->set('planting_date', '۱۴۰۵/۰۱/۰۱')
+            ->set('substrate_id', (string) $water->id)->assertSee('بازگشت محلول غذایی')
+            ->call('save')->assertHasErrors('substrateDetails.system')
+            ->set('substrateDetails', ['system' => 'nft', 'recirculation' => 'closed', 'aeration' => 'flow'])
+            ->call('save')->assertHasNoErrors();
+        $cycle = CultivationCycle::where('greenhouse_id', $greenhouse->id)->firstOrFail();
+        $this->assertSame('water', $cycle->substrate_details['profile']);
+        $this->assertSame('nft', $cycle->substrate_details['fields']['system']);
+    }
+
     public function test_owner_can_create_finish_and_request_a_correction(): void
     {
         $this->withoutVite();

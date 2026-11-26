@@ -11,7 +11,7 @@ use Livewire\Component;
 class JalaliPicker extends Component
 {
     #[Modelable]
-    public string $value = '';
+    public ?string $value = '';
 
     public string $label = 'تاریخ';
 
