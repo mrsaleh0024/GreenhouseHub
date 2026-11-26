@@ -35,6 +35,7 @@ class RoleWorkspacesTest extends TestCase
             $this->actingAs($user)->get(route('dashboard'))->assertOk()->assertViewIs($view);
             if ($role !== Role::GreenhouseOwner) {
                 Livewire::actingAs($user)->test(Cultivation::class, ['greenhouse' => $greenhouse])->call('startNew')->assertForbidden();
+                Livewire::actingAs($user)->test(Cultivation::class, ['greenhouse' => $greenhouse])->call('startFinish', 0)->assertForbidden();
             }
         }
     }

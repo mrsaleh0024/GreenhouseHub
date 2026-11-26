@@ -82,6 +82,7 @@ class CultivationCycleService
 
     public function finish(Greenhouse $greenhouse, CultivationCycle $cycle, User $user, string $endDate, ?string $yieldKg = null): void
     {
+        abort_unless($user->hasRole(Role::GreenhouseOwner->value), 403);
         DB::transaction(function () use ($greenhouse, $cycle, $user, $endDate, $yieldKg) {
             $locked = CultivationCycle::whereKey($cycle->id)->where('greenhouse_id', $greenhouse->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($user)->authorize('update', $locked);

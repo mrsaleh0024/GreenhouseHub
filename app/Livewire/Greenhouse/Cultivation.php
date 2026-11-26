@@ -157,6 +157,7 @@ class Cultivation extends Component
 
     public function startFinish(int $id): void
     {
+        abort_unless(auth()->user()->hasRole(Role::GreenhouseOwner->value), 403);
         $cycle = $this->cycle($id);
         Gate::authorize('update', $cycle);
         $this->resetForm();
@@ -289,7 +290,7 @@ class Cultivation extends Component
     {
         $greenhouse = $this->record();
         $cycles = CultivationCycle::visibleTo(auth()->user())->where('greenhouse_id', $greenhouse->id)
-            ->with(['crop:id,label_fa', 'zone:id,name'])->orderByDesc('planting_date')->orderByDesc('id')->paginate(12);
+            ->with(['crop:id,label_fa', 'zone:id,name', 'substrate:id,label_fa,slug'])->orderByDesc('planting_date')->orderByDesc('id')->paginate(12);
         $editing = $this->editingId ? $this->cycle($this->editingId) : null;
         if ($editing) {
             Gate::authorize('update', $editing);
