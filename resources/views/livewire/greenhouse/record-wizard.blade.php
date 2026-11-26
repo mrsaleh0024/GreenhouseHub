@@ -1,6 +1,6 @@
 <div x-data="formAccordion" x-on:click="toggle($event)" x-on:catalog-reveal="reveal($event.detail)" class="record-workspace mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
     <a wire:navigate href="{{ route('dashboard') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-green-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">
-        <span aria-hidden="true">→</span> بازگشت به داشبورد
+        <x-line-icon name="arrow-left" class="action-arrow action-arrow-back" /> بازگشت به داشبورد
     </a>
 
     <div class="mt-7 grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-12">
@@ -83,9 +83,16 @@
             @if ($step < 4)
                 <div class="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 pt-6">
                     @if ($step > 1)<button type="button" wire:click="previous" class="rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-700">مرحله قبل</button>@else <span class="text-xs text-gray-500">* اطلاعات ضروری</span> @endif
-                    <button type="button" wire:click="saveAndContinue" wire:loading.attr="disabled" wire:target="saveAndContinue" class="inline-flex items-center gap-2 rounded-xl bg-green-700 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700 disabled:opacity-60"><span wire:loading.remove wire:target="saveAndContinue">ذخیره و ادامه</span><span wire:loading wire:target="saveAndContinue">در حال ذخیره...</span><span aria-hidden="true">←</span></button>
+                    <button type="button" wire:click="saveAndContinue" wire:loading.attr="disabled" wire:target="saveAndContinue" class="inline-flex items-center gap-2 rounded-xl bg-green-700 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700 disabled:opacity-60"><span wire:loading.remove wire:target="saveAndContinue">ذخیره و ادامه</span><span wire:loading wire:target="saveAndContinue">در حال ذخیره...</span><x-line-icon name="arrow-left" class="action-arrow" /></button>
                 </div>
             @endif
+            @can('archive', $greenhouse)
+                <details class="record-danger-zone mt-10 rounded-xl border border-gray-200 p-5">
+                    <summary class="cursor-pointer text-sm font-semibold">مدیریت و حذف پرونده</summary>
+                    <p class="mt-4 text-sm leading-7 text-gray-600">حذف گلخانه، پرونده و اطلاعات وابسته را از پنل شما خارج می‌کند. بازیابی فقط توسط مدیر انجام می‌شود.</p>
+                    <livewire:greenhouse.record-removal :greenhouse-id="$greenhouse->id" :key="'remove-'.$greenhouse->id" />
+                </details>
+            @endcan
         </section>
     </div>
 </div>

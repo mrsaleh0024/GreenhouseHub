@@ -1,5 +1,5 @@
 <div class="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12 lg:px-8">
-    <a href="{{ route('dashboard') }}" class="text-sm font-semibold text-green-700 hover:underline">→ بازگشت به داشبورد</a>
+    <a href="{{ route('dashboard') }}" class="text-sm font-semibold text-green-700 hover:underline"><x-line-icon name="arrow-left" class="action-arrow action-arrow-back" /> بازگشت به داشبورد</a>
     <div class="mt-8"><p class="text-xs font-semibold text-green-700">مدیریت فهرست‌ها</p><h1 class="mt-3 text-2xl font-bold leading-10 text-gray-900 sm:text-3xl">گزینه‌های پیشنهادی</h1><p class="mt-2 max-w-2xl text-sm leading-7 text-gray-600">گزینه‌هایی را که کاربران در فهرست‌ها پیدا نکرده‌اند بررسی کنید؛ می‌توانید آن‌ها را تأیید یا با گزینه موجود ادغام کنید.</p></div>
     @if ($notice)<div role="status" class="mt-6 rounded-xl bg-green-50 px-5 py-4 text-sm text-green-800">{{ $notice }}</div>@endif
     @if ($errors->any())<div role="alert" class="mt-6 rounded-xl bg-red-50 px-5 py-4 text-sm leading-7 text-red-700">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif

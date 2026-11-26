@@ -1,5 +1,5 @@
 <div class="record-workspace mx-auto max-w-3xl px-4 py-10">
-    <a wire:navigate href="{{ route('dashboard') }}" class="text-green-700">→ بازگشت به گلخانه‌های من</a>
+    <a wire:navigate href="{{ route('dashboard') }}" class="text-green-700"><x-line-icon name="arrow-left" class="action-arrow action-arrow-back" /> بازگشت به گلخانه‌های من</a>
     <section class="mt-7 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
         <h1 class="text-2xl font-bold">افزودن گلخانه</h1>
         <p class="mt-3 text-sm leading-7 text-gray-600">گلخانه جدید به همین حساب متصل می‌شود. اطلاعات فنی را می‌توانید بعداً تکمیل کنید.</p>

@@ -34,6 +34,18 @@
     mask:var(--icon-url) center/contain no-repeat;
     -webkit-mask:var(--icon-url) center/contain no-repeat
 }
+.action-arrow { width:17px; height:17px; vertical-align:middle; transition:transform .2s var(--ease); }
+.action-arrow-back { transform:rotate(180deg); }
+.workspace-main a:has(> .action-arrow) { display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:10px 14px; border-radius:12px; background:rgb(var(--theme-primary)/.065); color:var(--brand); text-decoration:none; }
+.workspace-main a:has(> .action-arrow):hover { background:rgb(var(--theme-primary)/.13); }
+.workspace-main a:hover .action-arrow,.workspace-main button:hover .action-arrow { transform:translateX(-3px); }
+.workspace-main a:hover .action-arrow-back,.workspace-main button:hover .action-arrow-back { transform:translateX(3px) rotate(180deg); }
+.workspace-main a:has(.action-arrow):focus-visible,.workspace-main button:has(.action-arrow):focus-visible { outline:2px solid var(--brand); outline-offset:4px; }
+.workspace-main button:has(> .action-arrow):not(:has(span:not(.line-icon))) { display:inline-grid; place-items:center; min-width:44px; min-height:44px; color:var(--brand); background:rgb(var(--theme-primary)/.07); }
+.record-settings-link { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin-top:16px; color:var(--brand); font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
+.record-settings-link:hover { background:rgb(var(--theme-primary)/.08); }
+.record-danger-zone button.text-red-700 { border:1px solid color-mix(in srgb,var(--danger) 30%,transparent); background:color-mix(in srgb,var(--danger) 5%,var(--surface)); padding:10px 16px; border-radius:10px; min-height:44px; }
+.record-danger-zone button.text-red-700:hover { background:color-mix(in srgb,var(--danger) 12%,var(--surface)); }
 .location-choice { min-width: 0; }
 .location-trigger { display:flex; align-items:center; justify-content:space-between; width:100%; padding:14px 18px; border:1px solid var(--line); border-radius:14px; background:var(--surface); text-align:start; }
 .location-trigger small { display:block; color:var(--brand); font-size:11px; margin-bottom:6px; }
