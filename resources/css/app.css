@@ -2,15 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Edit these five values to change the site's light theme. */
-:root {
-    --theme-white: 255 255 255;
-    --theme-background: 243 239 232;
-    --theme-primary: 51 102 89;
-    --theme-primary-dark: 31 73 61;
-    --theme-text: 61 61 61;
-}
-
 [x-cloak] {
     display: none !important;
 }

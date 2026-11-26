@@ -15,8 +15,8 @@
     <body class="font-sans text-gray-900 antialiased">
         {{-- Tailwind must see both widths: max-w-md max-w-2xl --}}
         <div class="flex min-h-screen flex-col items-center justify-center bg-gray-100 px-4 py-8">
-            <a href="{{ route('home') }}" class="mb-6 text-xl font-bold text-green-700">
-                <x-brand />
+            <a href="{{ route('home') }}" class="mb-6">
+                <x-application-logo class="h-16 w-16 fill-current text-green-600" />
             </a>
 
             <div class="w-full {{ $maxWidth ?? 'max-w-md' }} rounded-xl bg-white p-6 shadow-lg sm:p-8">

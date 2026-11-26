@@ -13,8 +13,8 @@ class StackCheckTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('GreenhouseHub')
-            ->assertSee('مدیریت یکپارچه گلخانه')
-            ->assertSee('ایجاد حساب کاربری');
+            ->assertSee('Ping the server')
+            ->assertSee('Alpine playground');
     }
 
     public function test_livewire_handles_the_ping_action(): void
@@ -22,6 +22,7 @@ class StackCheckTest extends TestCase
         Livewire::test(SystemStatus::class)
             ->assertSet('pings', 0)
             ->call('ping')
-            ->assertSet('pings', 1);
+            ->assertSet('pings', 1)
+            ->assertSee('1</span> pings', false);
     }
 }
