@@ -6,9 +6,12 @@ use App\Models\CatalogItem;
 use App\Models\Greenhouse;
 use App\Models\Zone;
 use App\Services\ZoneService;
+use App\Services\CatalogService;
+use App\Services\CatalogVisibility;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -45,6 +48,7 @@ class Zones extends Component
     public array $equipmentQuantities = [];
 
     public string $notice = '';
+    public array $customLabels = [];
 
     public function mount(Greenhouse $greenhouse): void
     {
@@ -103,9 +107,10 @@ class Zones extends Component
         Validator::make(['ids' => $this->equipmentIds, 'quantities' => $this->equipmentQuantities], [
             'ids' => ['array'], 'ids.*' => ['integer', 'distinct'], 'quantities' => ['array'], 'quantities.*' => ['nullable', 'integer', 'between:1,65535'],
         ], ['integer' => 'تعداد تجهیزات باید عدد صحیح باشد.', 'between' => 'تعداد تجهیزات باید دست‌کم یک عدد باشد.'])->validate();
+        $notes = DB::table('zone_equipment')->where('zone_id', $zone->id)->pluck('notes', 'equipment_id')->all();
         $rows = [];
         foreach ($this->equipmentIds as $id) {
-            $rows[] = ['equipment_id' => (int) $id, 'quantity' => ($this->equipmentQuantities[$id] ?? '') === '' ? 1 : $this->equipmentQuantities[$id]];
+            $rows[] = ['equipment_id' => (int) $id, 'quantity' => ($this->equipmentQuantities[$id] ?? '') === '' ? 1 : $this->equipmentQuantities[$id], 'notes' => $notes[$id] ?? null];
         }
         $service->syncEquipment($zone, auth()->user(), $rows);
         $this->resetForm();
@@ -118,9 +123,42 @@ class Zones extends Component
         $this->resetForm();
     }
 
+    public function addCustom(string $type, CatalogService $service): void
+    {
+        Gate::authorize('manageZones', $this->record());
+        if ($type === 'zone_type' && $this->showForm) {
+            if ($this->editingId) {
+                Gate::authorize('update', $this->zone($this->editingId));
+            }
+        } elseif ($type === 'equipment' && $this->equipmentZoneId) {
+            Gate::authorize('update', $this->zone($this->equipmentZoneId));
+        } else {
+            throw ValidationException::withMessages(['zone' => 'گزینه معتبر نیست.']);
+        }
+        $label = $this->customLabels[$type] ?? '';
+        if (! is_string($label)) {
+            throw ValidationException::withMessages(['zone' => 'عنوان معتبر نیست.']);
+        }
+        try {
+            $item = $service->findOrCreateCustom($type, $label, auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addError('customLabels.'.$type, collect($exception->errors())->flatten()->first());
+            return;
+        }
+        if ($type === 'zone_type') {
+            $this->zone_type_id = (string) $item->id;
+        } else {
+            Validator::make(['ids' => $this->equipmentIds], ['ids' => ['array'], 'ids.*' => ['integer']])->validate();
+            $this->equipmentIds = array_values(array_unique([...$this->equipmentIds, (string) $item->id]));
+            $this->equipmentQuantities[$item->id] ??= '1';
+        }
+        $this->customLabels[$type] = '';
+        $this->notice = $item->status === 'pending' ? 'گزینه اضافه شد؛ پس از ذخیره قابل استفاده است و مدیر آن را بررسی می‌کند.' : 'گزینه موجود انتخاب شد.';
+    }
+
     private function resetForm(): void
     {
-        $this->reset(['editingId', 'equipmentZoneId', 'showForm', 'name', 'zone_type_id', 'area_m2', 'capacity_plants', 'equipmentIds', 'equipmentQuantities', 'notice']);
+        $this->reset(['editingId', 'equipmentZoneId', 'showForm', 'name', 'zone_type_id', 'area_m2', 'capacity_plants', 'equipmentIds', 'equipmentQuantities', 'notice', 'customLabels']);
         $this->resetErrorBag();
     }
 
@@ -146,8 +184,14 @@ class Zones extends Component
     {
         $greenhouse = $this->record();
         $zones = Zone::visibleTo(auth()->user())->where('greenhouse_id', $greenhouse->id)->orderBy('id')->paginate(12);
-        $equipment = CatalogItem::where('type', 'equipment')->where('status', 'approved')->orderByDesc('is_common')->orderBy('sort_order')->get();
-        $zoneTypes = CatalogItem::where('type', 'zone_type')->where('status', 'approved')->orderByDesc('is_common')->orderBy('sort_order')->get();
+        $attachedEquipment = $this->equipmentZoneId ? DB::table('zone_equipment')->where('zone_id', $this->zone($this->equipmentZoneId)->id)->pluck('equipment_id')->all() : [];
+        $equipmentQuery = CatalogItem::where('type', 'equipment');
+        CatalogVisibility::constrain($equipmentQuery, auth()->user(), $attachedEquipment);
+        $equipment = $equipmentQuery->orderByDesc('is_common')->orderBy('sort_order')->get();
+        $editingZone = $this->editingId ? $this->zone($this->editingId) : null;
+        $zoneTypeQuery = CatalogItem::where('type', 'zone_type');
+        CatalogVisibility::constrain($zoneTypeQuery, auth()->user(), array_filter([$editingZone?->zone_type_id]));
+        $zoneTypes = $zoneTypeQuery->orderByDesc('is_common')->orderBy('sort_order')->get();
         $equipmentByZone = DB::table('zone_equipment')->join('catalog_items', 'catalog_items.id', '=', 'zone_equipment.equipment_id')
             ->whereIn('zone_id', $zones->pluck('id'))->orderBy('catalog_items.sort_order')->get(['zone_equipment.zone_id', 'zone_equipment.quantity', 'catalog_items.label_fa'])->groupBy('zone_id');
 

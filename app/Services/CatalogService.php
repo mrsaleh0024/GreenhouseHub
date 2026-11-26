@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CatalogType;
 use App\Models\CatalogItem;
+use App\Models\CultivationCycle;
 use App\Models\User;
 use App\Models\Zone;
 use App\Support\PersianText;
@@ -41,7 +42,14 @@ class CatalogService
         }
         $expectedParent = $type->parentType();
         $parentItem = $parent === null ? null : CatalogItem::whereKey($parent)->where('type', $expectedParent?->value)->first();
-        if (($expectedParent === null && $parent !== null) || ($expectedParent !== null && (! $parentItem || ! Gate::forUser($user)->allows('view', $parentItem)))) {
+        $attachedParent = $parentItem && $type === CatalogType::Variety && CultivationCycle::visibleTo($user)->where('crop_id', $parentItem->id)->exists();
+        $parentVisible = false;
+        if ($parentItem) {
+            $parentQuery = CatalogItem::whereKey($parentItem->id);
+            CatalogVisibility::constrain($parentQuery, $user, $attachedParent ? [$parentItem->id] : []);
+            $parentVisible = $parentQuery->exists();
+        }
+        if (($expectedParent === null && $parent !== null) || ($expectedParent !== null && (! $parentItem || ! $parentVisible))) {
             throw ValidationException::withMessages(['parent' => 'مقدار والد معتبر نیست.']);
         }
         $label = trim($label);

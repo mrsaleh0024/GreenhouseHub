@@ -54,4 +54,25 @@ class CultivationTest extends TestCase
 
         $this->actingAs($other)->get(route('greenhouses.cultivation', $greenhouse))->assertNotFound();
     }
+
+    public function test_owner_can_add_a_custom_crop_and_variety_and_use_them_immediately(): void
+    {
+        $this->withoutVite();
+        $this->seed([RoleSeeder::class, CatalogSeeder::class]);
+        $owner = User::factory()->role(Role::GreenhouseOwner)->create();
+        $customer = Customer::create(['full_name' => 'مشتری', 'mobile' => '09123456789']);
+        $customer->users()->attach($owner);
+        $greenhouse = Greenhouse::create(['customer_id' => $customer->id, 'name' => 'گلخانه']);
+
+        Livewire::actingAs($owner)->test(Cultivation::class, ['greenhouse' => $greenhouse])->call('startNew')
+            ->set('customLabels.crop', 'محصول ویژه')->call('addCustom', 'crop')->assertHasNoErrors()
+            ->set('customLabels.variety', 'رقم ویژه')->call('addCustom', 'variety')->assertHasNoErrors()
+            ->set('planting_date', '۱۴۰۵/۰۱/۰۱')->call('save')->assertHasNoErrors();
+
+        $crop = CatalogItem::where('type', 'crop')->where('label_fa', 'محصول ویژه')->firstOrFail();
+        $variety = CatalogItem::where('type', 'variety')->where('label_fa', 'رقم ویژه')->firstOrFail();
+        $this->assertSame($crop->id, $variety->parent_id);
+        $this->assertSame('pending', $crop->status);
+        $this->assertDatabaseHas('cultivation_cycles', ['greenhouse_id' => $greenhouse->id, 'crop_id' => $crop->id, 'variety_id' => $variety->id]);
+    }
 }

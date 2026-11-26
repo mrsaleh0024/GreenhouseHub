@@ -36,6 +36,10 @@ class ZonesTest extends TestCase
         $component->call('startEquipment', $zone->id)->set('equipmentIds', [(string) $equipment->id])
             ->set('equipmentQuantities.'.$equipment->id, '2')->call('saveEquipment')->assertHasNoErrors();
         $this->assertDatabaseHas('zone_equipment', ['zone_id' => $zone->id, 'equipment_id' => $equipment->id, 'quantity' => 2]);
+        \Illuminate\Support\Facades\DB::table('zone_equipment')->where('zone_id', $zone->id)->update(['notes' => 'یادداشت قبلی']);
+        $component->call('startEquipment', $zone->id)->set('equipmentQuantities.'.$equipment->id, '3')
+            ->call('saveEquipment')->assertHasNoErrors();
+        $this->assertDatabaseHas('zone_equipment', ['zone_id' => $zone->id, 'equipment_id' => $equipment->id, 'quantity' => 3, 'notes' => 'یادداشت قبلی']);
     }
 
     public function test_expert_can_view_zones_but_cannot_start_an_edit(): void

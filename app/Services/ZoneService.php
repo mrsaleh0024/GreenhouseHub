@@ -28,7 +28,10 @@ class ZoneService
             }
             $data = Validator::make($input, [
                 'name' => ['required', 'string', 'max:120'],
-                'zone_type_id' => ['nullable', 'integer', Rule::exists('catalog_items', 'id')->where('type', 'zone_type')->where('status', 'approved')],
+                'zone_type_id' => ['nullable', 'integer', Rule::exists('catalog_items', 'id')->where(function ($query) use ($user, $zone) {
+                    $query->where('type', 'zone_type');
+                    CatalogVisibility::constrain($query, $user, array_filter([$zone?->zone_type_id]));
+                })],
                 'area_m2' => ['nullable', 'numeric', 'gt:0', 'max:99999999.99'],
                 'capacity_plants' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
             ], [
@@ -47,9 +50,14 @@ class ZoneService
     public function syncEquipment(Zone $zone, User $user, array $rows): void
     {
         Gate::forUser($user)->authorize('update', $zone);
+        $attached = DB::table('zone_equipment')->where('zone_id', $zone->id)->pluck('equipment_id')->all();
+        $equipmentRule = Rule::exists('catalog_items', 'id')->where(function ($query) use ($user, $attached) {
+            $query->where('type', 'equipment');
+            CatalogVisibility::constrain($query, $user, $attached);
+        });
         $data = Validator::make(['rows' => $rows], [
             'rows' => ['array'], 'rows.*' => ['required', 'array:equipment_id,quantity,notes'],
-            'rows.*.equipment_id' => ['required', 'integer', 'distinct', Rule::exists('catalog_items', 'id')->where('type', 'equipment')->where('status', 'approved')],
+            'rows.*.equipment_id' => ['required', 'integer', 'distinct', $equipmentRule],
             'rows.*.quantity' => ['required', 'integer', 'between:1,65535'],
             'rows.*.notes' => ['nullable', 'string', 'max:255'],
         ], [

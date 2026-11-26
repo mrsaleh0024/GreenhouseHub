@@ -31,12 +31,17 @@ class CultivationCycleService
                 throw ValidationException::withMessages(['cycle' => 'ثبت کشت جدید فقط برای گلخانه فعال امکان‌پذیر است.']);
             }
 
-            $catalog = fn (string $type) => Rule::exists('catalog_items', 'id')->where(fn ($query) => $query->where('type', $type)->where('status', 'approved'));
+            $catalog = function (string $type, string $field) use ($user, $cycle) {
+                return Rule::exists('catalog_items', 'id')->where(function ($query) use ($type, $field, $user, $cycle) {
+                    $query->where('type', $type);
+                    CatalogVisibility::constrain($query, $user, array_filter([$cycle?->{$field}]));
+                });
+            };
             $validator = Validator::make($input, [
                 'zone_id' => ['nullable', 'integer', Rule::exists('zones', 'id')->where('greenhouse_id', $lockedGreenhouse->id)->whereNull('deleted_at')],
-                'crop_id' => ['required', 'integer', $catalog('crop')],
-                'variety_id' => ['nullable', 'integer', $catalog('variety'), Rule::exists('catalog_items', 'id')->where('parent_id', $input['crop_id'] ?? null)],
-                'substrate_id' => ['nullable', 'integer', $catalog('substrate')],
+                'crop_id' => ['required', 'integer', $catalog('crop', 'crop_id')],
+                'variety_id' => ['nullable', 'integer', $catalog('variety', 'variety_id'), Rule::exists('catalog_items', 'id')->where('parent_id', $input['crop_id'] ?? null)],
+                'substrate_id' => ['nullable', 'integer', $catalog('substrate', 'substrate_id')],
                 'planting_date' => ['required', 'date_format:Y-m-d'],
                 'expected_harvest_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:planting_date'],
                 'harvest_started_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:planting_date', 'before_or_equal:today'],
