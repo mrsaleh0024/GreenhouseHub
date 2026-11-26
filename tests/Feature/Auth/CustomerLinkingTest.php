@@ -56,4 +56,20 @@ class CustomerLinkingTest extends TestCase
 
         $this->assertFalse($customer->users()->exists());
     }
+
+    public function test_repeat_unverified_registration_updates_the_existing_initial_greenhouse(): void
+    {
+        $province = CatalogItem::where('type', 'province')->where('slug', 'tehran')->firstOrFail();
+        $registration = fn () => Livewire::test(Register::class)->set('role', 'greenhouse_owner')->set('name', 'مالک آزمون')
+            ->set('mobile', '09123456789')->set('password', 'Password1')->set('password_confirmation', 'Password1')
+            ->set('province_id', (string) $province->id)->set('city', 'تهران');
+
+        $registration()->set('greenhouse_name', 'نام نخست')->call('register')->assertHasNoErrors();
+        $registration()->set('greenhouse_name', 'نام اصلاح‌شده')->call('register')->assertHasNoErrors();
+
+        $customer = Customer::where('mobile', '09123456789')->firstOrFail();
+        $this->assertSame(1, $customer->greenhouses()->count());
+        $this->assertSame('نام اصلاح‌شده', $customer->greenhouses()->firstOrFail()->name);
+        $this->assertFalse($customer->users()->exists());
+    }
 }
