@@ -11,8 +11,14 @@ trait VisibleToUser
 {
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        if ($user->hasAnyRole([Role::SuperAdmin->value, Role::Admin->value, Role::Expert->value])) {
+        if ($user->hasAnyRole([Role::SuperAdmin->value, Role::Admin->value])) {
             return $query;
+        }
+
+        if ($user->hasRole(Role::Expert->value)) {
+            return in_array($this->getTable(), ['greenhouses', 'zones', 'cultivation_cycles'], true)
+                ? $query
+                : $query->whereRaw('1 = 0');
         }
 
         if (! $user->hasRole(Role::GreenhouseOwner->value)) {

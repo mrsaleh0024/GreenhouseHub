@@ -3,6 +3,7 @@
 namespace Tests\Feature\Authorization;
 
 use App\Enums\Role;
+use App\Models\Activity;
 use App\Models\Customer;
 use App\Models\Greenhouse;
 use App\Models\User;
@@ -29,6 +30,11 @@ class ExpertAccessTest extends TestCase
         $this->assertFalse($expert->can('delete', $greenhouse));
         $this->assertFalse($expert->can('update', $customer));
         $this->assertFalse($expert->can('updateContact', $customer));
+        $this->assertFalse($expert->can('view', $customer));
+        $this->assertFalse($expert->can('viewAny', Customer::class));
+        $this->assertFalse(Customer::visibleTo($expert)->whereKey($customer)->exists());
+        $this->assertFalse($expert->can('viewAny', Activity::class));
+        $this->assertFalse($expert->can('viewInternalNotes', $greenhouse));
     }
 
     public function test_expert_cannot_modify_greenhouse_options_through_the_service(): void

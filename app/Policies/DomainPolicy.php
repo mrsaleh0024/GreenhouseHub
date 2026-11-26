@@ -50,7 +50,7 @@ class DomainPolicy
 
     public function viewInternalNotes(User $user, Model $model): bool
     {
-        return $this->staff($user);
+        return $this->admin($user);
     }
 
     public function changeStatus(User $user, Model $model): bool
