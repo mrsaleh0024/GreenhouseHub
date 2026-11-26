@@ -12,6 +12,7 @@ use App\Services\CatalogService;
 use App\Services\CatalogVisibility;
 use App\Services\CorrectionRequestService;
 use App\Services\CultivationCycleService;
+use App\Services\SubstrateProfile;
 use App\Support\JalaliDate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -73,6 +74,13 @@ class Cultivation extends Component
 
     public array $customLabels = [];
 
+    public array $substrateDetails = [];
+
+    public function updatedSubstrateId(): void
+    {
+        $this->substrateDetails = [];
+    }
+
     public function mount(Greenhouse $greenhouse): void
     {
         $this->greenhouseId = $greenhouse->id;
@@ -93,6 +101,10 @@ class Cultivation extends Component
         Gate::authorize('update', $cycle);
         $this->resetForm();
         $this->editingId = $cycle->id;
+        $this->substrateDetails = $cycle->substrate_details['fields'] ?? [];
+        if (! empty($this->substrateDetails['measurement_date'])) {
+            $this->substrateDetails['measurement_date'] = JalaliDate::fromGregorian($this->substrateDetails['measurement_date']);
+        }
         foreach (['crop_id', 'variety_id', 'zone_id', 'substrate_id', 'plant_count', 'planted_area_m2'] as $field) {
             $this->{$field} = (string) ($cycle->{$field} ?? '');
         }
@@ -116,11 +128,15 @@ class Cultivation extends Component
         $data = [
             'crop_id' => $this->nullable($this->crop_id), 'variety_id' => $this->nullable($this->variety_id), 'zone_id' => $this->nullable($this->zone_id),
             'substrate_id' => $this->nullable($this->substrate_id), 'plant_count' => $this->nullable($this->plant_count),
+            'substrate_details' => $this->substrateDetails,
             'planted_area_m2' => $this->nullable($this->planted_area_m2),
             'planting_date' => $this->jalali($this->planting_date, 'planting_date'),
             'expected_harvest_date' => $this->jalali($this->expected_harvest_date, 'expected_harvest_date'),
             'harvest_started_on' => $this->jalali($this->harvest_started_on, 'harvest_started_on'),
         ];
+        if (! empty($data['substrate_details']['measurement_date']) && is_string($data['substrate_details']['measurement_date'])) {
+            $data['substrate_details']['measurement_date'] = JalaliDate::toGregorian($data['substrate_details']['measurement_date'], 'substrateDetails.measurement_date');
+        }
         $correctEnd = $cycle && $cycle->harvest_ended_on && auth()->user()->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value]);
         $endDate = $correctEnd ? $this->jalali($this->end_date, 'end_date') : null;
         if ($correctEnd && $endDate === null) {
@@ -240,6 +256,7 @@ class Cultivation extends Component
 
     private function resetForm(): void
     {
+        $this->substrateDetails = [];
         $this->reset(['editingId', 'editingClosed', 'finishId', 'correctionId', 'showForm', 'crop_id', 'variety_id', 'zone_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'plant_count', 'planted_area_m2', 'end_date', 'yield_kg', 'correction_details', 'notice', 'customLabels']);
         $this->resetErrorBag();
     }
@@ -294,6 +311,7 @@ class Cultivation extends Component
         }
 
         return view('livewire.greenhouse.cultivation', [
+            'substrateProfile' => SubstrateProfile::forItem($catalog->get('substrate', collect())->firstWhere('id', (int) $this->substrate_id)),
             'greenhouse' => $greenhouse, 'cycles' => $cycles, 'catalog' => $catalog, 'corrections' => $corrections, 'varieties' => $varieties,
             'zones' => Zone::where('greenhouse_id', $greenhouse->id)->orderBy('code')->get(['id', 'name', 'code']),
         ]);

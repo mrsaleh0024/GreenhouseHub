@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\Role;
+use App\Models\CatalogItem;
 use App\Models\CultivationCycle;
 use App\Models\Greenhouse;
 use App\Models\User;
@@ -19,7 +20,7 @@ class CultivationCycleService
         if ($cycle === null) {
             abort_unless($user->hasRole(Role::GreenhouseOwner->value), 403);
         }
-        $allowed = ['zone_id', 'crop_id', 'variety_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'plant_count', 'planted_area_m2'];
+        $allowed = ['zone_id', 'crop_id', 'variety_id', 'substrate_id', 'substrate_details', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'plant_count', 'planted_area_m2'];
         if (array_diff(array_keys($input), $allowed) !== []) {
             throw ValidationException::withMessages(['cycle' => 'تغییر اطلاعات کلیدی از این بخش مجاز نیست.']);
         }
@@ -34,6 +35,11 @@ class CultivationCycleService
                 throw ValidationException::withMessages(['cycle' => 'ثبت کشت جدید فقط برای گلخانه فعال امکان‌پذیر است.']);
             }
 
+            $details = $input['substrate_details'] ?? [];
+            unset($input['substrate_details']);
+            if (! is_array($details)) {
+                throw ValidationException::withMessages(['substrateDetails' => 'اطلاعات بستر معتبر نیست.']);
+            }
             $catalog = function (string $type, string $field) use ($user, $cycle) {
                 return Rule::exists('catalog_items', 'id')->where(function ($query) use ($type, $field, $user, $cycle) {
                     $query->where('type', $type);
@@ -64,6 +70,7 @@ class CultivationCycleService
 
             $cycle ??= new CultivationCycle(['greenhouse_id' => $lockedGreenhouse->id]);
             $cycle->fill($values);
+            $cycle->substrate_details = SubstrateProfile::validate(CatalogItem::find($values['substrate_id'] ?? null), $details);
             if (! $cycle->harvest_ended_on && $cycle->status !== 'aborted') {
                 $cycle->status = ($values['harvest_started_on'] ?? null) ? 'harvesting' : (($values['planting_date'] > now()->toDateString()) ? 'planned' : 'growing');
             }

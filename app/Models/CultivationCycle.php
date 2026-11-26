@@ -18,7 +18,7 @@ class CultivationCycle extends Model
 
     protected function casts(): array
     {
-        return ['planting_date' => 'date', 'expected_harvest_date' => 'date', 'harvest_started_on' => 'date', 'harvest_ended_on' => 'date'];
+        return ['planting_date' => 'date', 'expected_harvest_date' => 'date', 'harvest_started_on' => 'date', 'harvest_ended_on' => 'date', 'substrate_details' => 'array'];
     }
 
     protected static function booted(): void
