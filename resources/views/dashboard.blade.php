@@ -12,6 +12,9 @@
         @if ($isOwner && $records->isNotEmpty())<x-owner-prompts :greenhouse="$records->first()" />@endif
 
         <section aria-labelledby="records-heading" class="mt-10">
+            @if ($isOwner)
+                <a wire:navigate href="{{ route('greenhouses.create') }}" class="mb-5 inline-flex items-center gap-2 rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white"><x-line-icon name="greenhouse" /> افزودن گلخانه</a>
+            @endif
             <div class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-xs font-semibold text-green-700">پرونده دیجیتال</p><h2 id="records-heading" class="mt-2 text-xl font-bold text-gray-900">{{ $isOwner ? 'گلخانه‌های من' : 'گلخانه‌ها' }}</h2></div><p class="text-xs text-gray-600">{{ $records->total() }} پرونده</p></div>
 
             @forelse ($records as $record)

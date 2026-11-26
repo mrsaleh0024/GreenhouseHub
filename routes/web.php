@@ -12,6 +12,7 @@ use App\Livewire\Auth\Register;
 use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Auth\TwoFactorChallenge;
 use App\Livewire\Auth\VerifyMobile;
+use App\Livewire\Greenhouse\CreateGreenhouse;
 use App\Livewire\Greenhouse\Cultivation;
 use App\Livewire\Greenhouse\RecordWizard;
 use App\Livewire\Greenhouse\Zones;
@@ -33,6 +34,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'active'])->group(function () {
     // One shared layout for every role; the menu differs per role (config/navigation.php).
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/greenhouses/create', CreateGreenhouse::class)->name('greenhouses.create');
     Route::get('/greenhouses/{greenhouse}/complete', RecordWizard::class)->name('greenhouses.complete');
     Route::get('/greenhouses/{greenhouse}/cultivation', Cultivation::class)->name('greenhouses.cultivation');
     Route::get('/greenhouses/{greenhouse}/zones', Zones::class)->name('greenhouses.zones');
