@@ -12,10 +12,18 @@
         @if ($isOwner && $records->isNotEmpty())<x-owner-prompts :greenhouse="$records->first()" />@endif
 
         <section aria-labelledby="records-heading" class="mt-10">
-            @if ($isOwner)
-                <a wire:navigate href="{{ route('greenhouses.create') }}" class="mb-5 inline-flex items-center gap-2 rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white"><x-line-icon name="greenhouse" /> افزودن گلخانه</a>
-            @endif
-            <div class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-xs font-semibold text-green-700">پرونده دیجیتال</p><h2 id="records-heading" class="mt-2 text-xl font-bold text-gray-900">{{ $isOwner ? 'گلخانه‌های من' : 'گلخانه‌ها' }}</h2></div><p class="text-xs text-gray-600">{{ $records->total() }} پرونده</p></div>
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold text-green-700">پرونده دیجیتال · {{ $records->total() }} پرونده</p>
+                    <h2 id="records-heading" class="mt-2 text-xl font-bold text-gray-900">{{ $isOwner ? 'گلخانه‌های من' : 'گلخانه‌ها' }}</h2>
+                </div>
+                @if ($isOwner)
+                    <a wire:navigate href="{{ route('greenhouses.create') }}" class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-green-700/20 bg-white px-4 py-2.5 text-sm font-semibold text-green-700 hover:border-green-700/40 hover:bg-green-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">
+                        <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                        افزودن گلخانه
+                    </a>
+                @endif
+            </div>
 
             @forelse ($records as $record)
                 <article class="mt-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
