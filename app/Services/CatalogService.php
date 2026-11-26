@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\CatalogType;
+use App\Enums\Role;
 use App\Models\CatalogItem;
 use App\Models\User;
 use App\Support\PersianText;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -12,25 +15,54 @@ use Illuminate\Validation\ValidationException;
 
 class CatalogService
 {
-    public function findOrCreateCustom(string $type, string $label, User $user, ?int $parent = null): CatalogItem
+    public function forPicker(CatalogType $type, User $viewer, ?string $q = null, ?int $parentId = null, int $limit = 50): Collection
     {
-        if (! in_array($type, ['city', 'variety', 'crop', 'substrate', 'equipment', 'zone_type', 'structure_type', 'cultivation_type', 'irrigation_type', 'heating_system', 'cooling_system', 'water_source', 'ventilation_system'], true)) {
+        Gate::forUser($viewer)->authorize('viewAny', CatalogItem::class);
+        $staff = $viewer->hasAnyRole([Role::SuperAdmin->value, Role::Admin->value, Role::Expert->value]);
+        $query = CatalogItem::where('type', $type->value)->where(function ($query) use ($viewer, $staff) {
+            $query->where('status', 'approved')->orWhere(function ($query) use ($viewer, $staff) {
+                $query->where('status', 'pending');
+                if (! $staff) {
+                    $query->where('created_by', $viewer->id);
+                }
+            });
+        });
+        if ($parentId !== null) {
+            $query->where('parent_id', $parentId);
+        }
+        if (filled($q)) {
+            $query->where('normalized_label', 'like', '%'.PersianText::normalize($q).'%');
+        }
+
+        return $query->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->limit(max(1, min(100, $limit)))->get();
+    }
+
+    public function findOrCreateCustom(CatalogType|string $type, string $label, User $user, ?int $parent = null): CatalogItem
+    {
+        Gate::forUser($user)->authorize('create', CatalogItem::class);
+        $type = $type instanceof CatalogType ? $type : CatalogType::tryFrom($type);
+        if (! $type || ! $type->isUserCreatable()) {
             throw ValidationException::withMessages(['type' => 'این فهرست قابل افزودن نیست.']);
         }
-        $expectedParent = match ($type) {
-            'city' => 'province', 'variety' => 'crop', default => null
-        };
-        if (($expectedParent === null && $parent !== null) || ($expectedParent !== null && ! CatalogItem::whereKey($parent)->where('type', $expectedParent)->where('status', 'approved')->exists())) {
+        $expectedParent = $type->parentType();
+        $parentItem = $parent === null ? null : CatalogItem::whereKey($parent)->where('type', $expectedParent?->value)->first();
+        if (($expectedParent === null && $parent !== null) || ($expectedParent !== null && (! $parentItem || ! Gate::forUser($user)->allows('view', $parentItem)))) {
             throw ValidationException::withMessages(['parent' => 'مقدار والد معتبر نیست.']);
         }
+        $label = trim($label);
         $norm = PersianText::normalize($label);
-        if ($norm === '') {
+        if ($norm === '' || mb_strlen($label) > 150) {
             throw ValidationException::withMessages(['label' => 'عنوان معتبر نیست.']);
         }
-        $item = CatalogItem::where(['type' => $type, 'parent_key' => $parent ?? 0, 'normalized_label' => $norm])->first();
+        $item = CatalogItem::where(['type' => $type->value, 'parent_key' => $parent ?? 0, 'normalized_label' => $norm])->first();
         if ($item) {
-            while ($item->status === 'merged' && $item->mergedInto) {
-                $item = $item->mergedInto;
+            $visited = [];
+            while ($item->status === 'merged') {
+                if (isset($visited[$item->id])) {
+                    throw new \LogicException('زنجیره ادغام کاتالوگ نامعتبر است.');
+                }
+                $visited[$item->id] = true;
+                $item = $item->mergedInto ?? throw new \LogicException('مقصد ادغام کاتالوگ پیدا نشد.');
             }
 
             return $item;
@@ -39,7 +71,7 @@ class CatalogService
         if (RateLimiter::tooManyAttempts($key, 50)) {
             throw ValidationException::withMessages(['label' => 'تعداد درخواست‌ها بیش از حد مجاز است.']);
         }
-        $created = CatalogItem::create(['type' => $type, 'parent_id' => $parent, 'slug' => 'custom_'.strtolower(bin2hex(random_bytes(6))), 'label_fa' => $label, 'status' => $type === 'city' ? 'approved' : 'pending', 'source' => 'user', 'created_by' => $user->id]);
+        $created = CatalogItem::create(['type' => $type->value, 'parent_id' => $parent, 'slug' => 'custom_'.strtolower(bin2hex(random_bytes(6))), 'label_fa' => $label, 'status' => $type->autoApproves() ? 'approved' : 'pending', 'source' => 'user', 'created_by' => $user->id]);
         RateLimiter::hit($key, 3600);
 
         return $created;
