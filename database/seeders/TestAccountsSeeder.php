@@ -35,5 +35,7 @@ class TestAccountsSeeder extends Seeder
             $user->forceFill(['status' => UserStatus::Active, 'mobile_verified_at' => now()])->save();
             $user->assignRole($role->value);
         }
+
+        $this->call(DemoFoundationSeeder::class);
     }
 }
