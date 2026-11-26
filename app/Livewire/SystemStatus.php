@@ -82,6 +82,6 @@ class SystemStatus extends Component
     public function render()
     {
         return view('livewire.system-status')
-            ->layout('components.layouts.app', ['title' => 'GreenhouseHub — stack check']);
+            ->layout('components.layouts.app', ['title' => config('app.name', 'GreenhouseHub')]);
     }
 }

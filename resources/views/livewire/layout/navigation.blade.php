@@ -33,8 +33,7 @@ new class extends Component
         <div class="flex h-16 items-center justify-between">
             <div class="flex items-center gap-8">
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-bold text-green-700">
-                    <x-application-logo class="h-8 w-8 fill-current text-green-600" />
-                    <span>{{ config('app.name', 'GreenhouseHub') }}</span>
+                    <x-brand />
                 </a>
 
                 <div class="hidden items-center gap-6 sm:flex">
