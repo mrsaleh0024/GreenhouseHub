@@ -2,12 +2,11 @@
 
 namespace App\Livewire\Greenhouse;
 
-use App\Models\CatalogItem;
 use App\Models\Greenhouse;
 use App\Models\Zone;
-use App\Services\ZoneService;
+use App\Services\CatalogDirectory;
 use App\Services\CatalogService;
-use App\Services\CatalogVisibility;
+use App\Services\ZoneService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -19,7 +18,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
-#[Title('ناحیه‌های گلخانه')]
+#[Title('بخش‌های گلخانه')]
 class Zones extends Component
 {
     use WithPagination;
@@ -48,6 +47,7 @@ class Zones extends Component
     public array $equipmentQuantities = [];
 
     public string $notice = '';
+
     public array $customLabels = [];
 
     public function mount(Greenhouse $greenhouse): void
@@ -85,7 +85,7 @@ class Zones extends Component
             'area_m2' => $this->nullable($this->area_m2), 'capacity_plants' => $this->nullable($this->capacity_plants),
         ], $zone);
         $this->resetForm();
-        $this->notice = 'اطلاعات ناحیه ذخیره شد.';
+        $this->notice = 'اطلاعات بخش ذخیره شد.';
     }
 
     public function startEquipment(int $id): void
@@ -114,7 +114,7 @@ class Zones extends Component
         }
         $service->syncEquipment($zone, auth()->user(), $rows);
         $this->resetForm();
-        $this->notice = 'تجهیزات ناحیه ذخیره شد.';
+        $this->notice = 'تجهیزات بخش ذخیره شد.';
     }
 
     public function cancel(): void
@@ -143,6 +143,7 @@ class Zones extends Component
             $item = $service->findOrCreateCustom($type, $label, auth()->user());
         } catch (ValidationException $exception) {
             $this->addError('customLabels.'.$type, collect($exception->errors())->flatten()->first());
+
             return;
         }
         if ($type === 'zone_type') {
@@ -185,13 +186,9 @@ class Zones extends Component
         $greenhouse = $this->record();
         $zones = Zone::visibleTo(auth()->user())->where('greenhouse_id', $greenhouse->id)->orderBy('id')->paginate(12);
         $attachedEquipment = $this->equipmentZoneId ? DB::table('zone_equipment')->where('zone_id', $this->zone($this->equipmentZoneId)->id)->pluck('equipment_id')->all() : [];
-        $equipmentQuery = CatalogItem::where('type', 'equipment');
-        CatalogVisibility::constrain($equipmentQuery, auth()->user(), $attachedEquipment);
-        $equipment = $equipmentQuery->orderByDesc('is_common')->orderBy('sort_order')->get();
+        $equipment = CatalogDirectory::visible(['equipment'], auth()->user(), $attachedEquipment);
         $editingZone = $this->editingId ? $this->zone($this->editingId) : null;
-        $zoneTypeQuery = CatalogItem::where('type', 'zone_type');
-        CatalogVisibility::constrain($zoneTypeQuery, auth()->user(), array_filter([$editingZone?->zone_type_id]));
-        $zoneTypes = $zoneTypeQuery->orderByDesc('is_common')->orderBy('sort_order')->get();
+        $zoneTypes = CatalogDirectory::visible(['zone_type'], auth()->user(), array_filter([$editingZone?->zone_type_id]));
         $equipmentByZone = DB::table('zone_equipment')->join('catalog_items', 'catalog_items.id', '=', 'zone_equipment.equipment_id')
             ->whereIn('zone_id', $zones->pluck('id'))->orderBy('catalog_items.sort_order')->get(['zone_equipment.zone_id', 'zone_equipment.quantity', 'catalog_items.label_fa'])->groupBy('zone_id');
 

@@ -8,6 +8,7 @@ use App\Models\CorrectionRequest;
 use App\Models\CultivationCycle;
 use App\Models\Greenhouse;
 use App\Models\Zone;
+use App\Services\CatalogDirectory;
 use App\Services\CatalogService;
 use App\Services\CatalogVisibility;
 use App\Services\CorrectionRequestService;
@@ -294,9 +295,7 @@ class Cultivation extends Component
             Gate::authorize('update', $editing);
         }
         $attached = array_filter([$editing?->crop_id, $editing?->variety_id, $editing?->substrate_id]);
-        $catalogQuery = CatalogItem::whereIn('type', ['crop', 'substrate']);
-        CatalogVisibility::constrain($catalogQuery, auth()->user(), $attached);
-        $catalog = $catalogQuery->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->get()->groupBy('type');
+        $catalog = CatalogDirectory::visible(['crop', 'substrate'], auth()->user(), $attached)->groupBy('type');
         $varieties = collect();
         if (ctype_digit($this->crop_id)) {
             $varietyQuery = CatalogItem::where('type', 'variety')->where('parent_id', (int) $this->crop_id);

@@ -6,6 +6,8 @@ use App\Models\Concerns\LogsActivity;
 use App\Support\PersianText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class CatalogItem extends Model
 {
@@ -20,6 +22,14 @@ class CatalogItem extends Model
 
     protected static function booted(): void
     {
+        $invalidate = function (): void {
+            Cache::forget('catalog.approved.v2');
+            if (DB::transactionLevel() > 0) {
+                DB::afterCommit(fn () => Cache::forget('catalog.approved.v2'));
+            }
+        };
+        static::saved($invalidate);
+        static::deleted($invalidate);
         static::saving(function (self $m) {
             if ($m->exists && $m->getOriginal('status') === 'approved' && $m->isDirty('slug')) {
                 throw new \LogicException('شناسه گزینه تأییدشده قابل تغییر نیست.');

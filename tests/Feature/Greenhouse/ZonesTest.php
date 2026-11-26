@@ -12,6 +12,7 @@ use App\Models\Zone;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -31,12 +32,12 @@ class ZonesTest extends TestCase
 
         $component = Livewire::actingAs($owner)->test(Zones::class, ['greenhouse' => $greenhouse])
             ->call('startNew')->set('name', 'سالن یک')->set('capacity_plants', '400')
-            ->call('save')->assertHasNoErrors()->assertSee('اطلاعات ناحیه ذخیره شد');
+            ->call('save')->assertHasNoErrors()->assertSee('اطلاعات بخش ذخیره شد');
         $zone = Zone::where('greenhouse_id', $greenhouse->id)->firstOrFail();
         $component->call('startEquipment', $zone->id)->set('equipmentIds', [(string) $equipment->id])
             ->set('equipmentQuantities.'.$equipment->id, '2')->call('saveEquipment')->assertHasNoErrors();
         $this->assertDatabaseHas('zone_equipment', ['zone_id' => $zone->id, 'equipment_id' => $equipment->id, 'quantity' => 2]);
-        \Illuminate\Support\Facades\DB::table('zone_equipment')->where('zone_id', $zone->id)->update(['notes' => 'یادداشت قبلی']);
+        DB::table('zone_equipment')->where('zone_id', $zone->id)->update(['notes' => 'یادداشت قبلی']);
         $component->call('startEquipment', $zone->id)->set('equipmentQuantities.'.$equipment->id, '3')
             ->call('saveEquipment')->assertHasNoErrors();
         $this->assertDatabaseHas('zone_equipment', ['zone_id' => $zone->id, 'equipment_id' => $equipment->id, 'quantity' => 3, 'notes' => 'یادداشت قبلی']);
@@ -51,7 +52,7 @@ class ZonesTest extends TestCase
         $greenhouse = Greenhouse::create(['customer_id' => $customer->id, 'name' => 'گلخانه']);
         $zone = Zone::create(['greenhouse_id' => $greenhouse->id, 'name' => 'سالن']);
 
-        $this->actingAs($expert)->get(route('greenhouses.zones', $greenhouse))->assertOk()->assertSee('سالن')->assertDontSee('افزودن ناحیه');
+        $this->actingAs($expert)->get(route('greenhouses.zones', $greenhouse))->assertOk()->assertSee('سالن')->assertDontSee('افزودن بخش');
         Livewire::actingAs($expert)->test(Zones::class, ['greenhouse' => $greenhouse])->call('startEdit', $zone->id)->assertForbidden();
     }
 }

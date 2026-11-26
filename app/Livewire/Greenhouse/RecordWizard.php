@@ -2,13 +2,13 @@
 
 namespace App\Livewire\Greenhouse;
 
+use App\Enums\Role;
 use App\Models\CatalogItem;
 use App\Models\CorrectionRequest;
 use App\Models\Greenhouse;
-use App\Enums\Role;
-use App\Services\CorrectionRequestService;
+use App\Services\CatalogDirectory;
 use App\Services\CatalogService;
-use App\Services\CatalogVisibility;
+use App\Services\CorrectionRequestService;
 use App\Services\GreenhouseRecordService;
 use App\Services\GreenhouseService;
 use App\Support\JalaliDate;
@@ -84,6 +84,7 @@ class RecordWizard extends Component
             $service->request(auth()->user(), $this->record(), $this->correctionDetails);
         } catch (ValidationException $exception) {
             $this->addError('correctionDetails', collect($exception->errors())->flatten()->first());
+
             return;
         }
         $this->correctionDetails = '';
@@ -198,9 +199,7 @@ class RecordWizard extends Component
         $types = ['structure_type', 'cultivation_type', 'irrigation_type', 'heating_system', 'cooling_system', 'water_source', 'ventilation_system'];
         $attached = DB::table('greenhouse_options')->where('greenhouse_id', $greenhouse->id)->pluck('catalog_item_id')->all();
         $attached = array_merge($attached, array_filter([$greenhouse->structure_type_id, $greenhouse->cultivation_type_id]));
-        $query = CatalogItem::whereIn('type', $types);
-        CatalogVisibility::constrain($query, auth()->user(), $attached);
-        $catalog = $query->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->get()->groupBy('type');
+        $catalog = CatalogDirectory::visible($types, auth()->user(), $attached)->groupBy('type');
 
         $corrections = auth()->user()->hasRole(Role::GreenhouseOwner->value)
             ? CorrectionRequest::where('greenhouse_id', $greenhouse->id)->whereNull('cultivation_cycle_id')->where('requested_by', auth()->id())->latest()->limit(10)->get()
