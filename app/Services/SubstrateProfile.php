@@ -19,7 +19,17 @@ class SubstrateProfile
             }
         }
 
-        return ['key' => 'solid'] + config('substrate_profiles.solid');
+        $profile = ['key' => 'solid'] + config('substrate_profiles.solid');
+        $specific = match ($item->slug) {
+            'cocopeat', 'coco_perlite_mix' => ['conditioning' => ['label' => 'فرآوری کوکوپیت', 'options' => ['washed_buffered' => 'شسته و بافرشده', 'washed' => 'فقط شسته‌شده', 'raw' => 'خام', 'unknown' => 'اطلاع ندارم']]],
+            'rockwool' => ['format' => ['label' => 'شکل پشم سنگ', 'options' => ['slab' => 'اسلب', 'block' => 'بلوک کشت', 'cube' => 'مکعب نشاء', 'loose' => 'الیاف فله', 'unknown' => 'اطلاع ندارم']]],
+            'perlite' => ['grade' => ['label' => 'دانه‌بندی پرلیت', 'options' => ['fine' => 'ریز', 'medium' => 'متوسط', 'coarse' => 'درشت', 'mixed' => 'مخلوط', 'unknown' => 'اطلاع ندارم']]],
+            'peat_moss' => ['peat_type' => ['label' => 'نوع پیت‌ماس', 'options' => ['white' => 'روشن (بلوند)', 'black' => 'تیره', 'mix' => 'ترکیبی', 'unknown' => 'اطلاع ندارم']]],
+            default => [],
+        };
+        $profile['fields'] = $specific + $profile['fields'];
+
+        return $profile;
     }
 
     public static function validate(?CatalogItem $item, array $data): ?array
