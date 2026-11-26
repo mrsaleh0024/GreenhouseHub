@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\VisibleToUser;
 use App\Services\GreenhouseCompleteness;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,9 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Zone extends Model
 {
-    use \App\Models\Concerns\VisibleToUser, LogsActivity, SoftDeletes;
+    use LogsActivity, SoftDeletes, VisibleToUser;
 
-    protected $fillable = ['greenhouse_id', 'code', 'name', 'zone_type_id', 'area_m2', 'capacity_plants', 'status', 'notes'];
+    protected $fillable = ['greenhouse_id', 'name', 'zone_type_id', 'area_m2', 'capacity_plants', 'status', 'notes'];
 
     protected static function booted(): void
     {
@@ -25,10 +26,7 @@ class Zone extends Model
         static::deleted($refresh);
         static::restored($refresh);
         static::creating(function (self $m) {
-            if (! $m->code) {
-                $n = static::withTrashed()->where('greenhouse_id', $m->greenhouse_id)->count() + 1;
-                $m->code = sprintf('Z%02d', $n);
-            }
+            $m->code = app(CodeGenerator::class)->nextZone((int) $m->greenhouse_id);
         });
         static::saving(fn (self $m) => $m->exists && $m->isDirty('code') ? throw new \LogicException('کد ناحیه قابل تغییر نیست.') : null);
     }
