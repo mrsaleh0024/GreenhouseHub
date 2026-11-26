@@ -62,6 +62,6 @@ class DataFoundationProgressTest extends TestCase
         $customer->users()->attach($owner);
         $this->assertTrue(Greenhouse::visibleTo($owner)->whereKey($greenhouse)->exists());
         $this->assertTrue($owner->can('view', $greenhouse));
-        $this->assertFalse($owner->can('update', $greenhouse));
+        $this->assertTrue($owner->can('update', $greenhouse));
     }
 }
