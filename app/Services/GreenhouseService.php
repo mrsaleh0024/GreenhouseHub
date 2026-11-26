@@ -24,17 +24,33 @@ class GreenhouseService
             if ($items->count() !== count($values) || ($items->contains('slug', 'none') && $items->count() > 1)) {
                 throw ValidationException::withMessages(['options' => 'گزینه‌های انتخاب‌شده معتبر نیستند.']);
             }
-            $ids = array_merge($ids, $values);
+            $ids[$group] = $items->modelKeys();
         }
-        DB::transaction(function () use ($greenhouse, $ids) {
-            $old = DB::table('greenhouse_options')->join('catalog_items', 'catalog_items.id', '=', 'greenhouse_options.catalog_item_id')->where('greenhouse_id', $greenhouse->id)->pluck('slug')->all();
-            DB::table('greenhouse_options')->where('greenhouse_id', $greenhouse->id)->delete();
-            foreach ($ids as $id) {
-                DB::table('greenhouse_options')->insert(['greenhouse_id' => $greenhouse->id, 'catalog_item_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::transaction(function () use ($greenhouse, $ids, $user) {
+            $locked = Greenhouse::whereKey($greenhouse->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($user)->authorize('update', $locked);
+            $old = [];
+            $new = [];
+            foreach ($ids as $group => $groupIds) {
+                $current = DB::table('greenhouse_options')->join('catalog_items', 'catalog_items.id', '=', 'greenhouse_options.catalog_item_id')
+                    ->where('greenhouse_id', $locked->id)->where('catalog_items.type', $group)
+                    ->orderBy('catalog_items.slug')->pluck('catalog_items.slug')->all();
+                $selected = CatalogItem::whereIn('id', $groupIds)->orderBy('slug')->pluck('slug')->all();
+                if ($current === $selected) {
+                    continue;
+                }
+                $old[$group] = $current;
+                $new[$group] = $selected;
+                DB::table('greenhouse_options')->where('greenhouse_id', $locked->id)
+                    ->whereIn('catalog_item_id', CatalogItem::where('type', $group)->select('id'))->delete();
+                foreach ($groupIds as $id) {
+                    DB::table('greenhouse_options')->insert(['greenhouse_id' => $locked->id, 'catalog_item_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
+                }
             }
-            $new = CatalogItem::whereIn('id', $ids)->pluck('slug')->all();
-            app(ActivityLogger::class)->log($greenhouse, 'options_changed', ['options' => ['old' => $old, 'new' => $new]]);
-            app(GreenhouseCompleteness::class)->update($greenhouse);
+            if ($old !== []) {
+                app(ActivityLogger::class)->log($locked, 'options_changed', ['options' => ['old' => $old, 'new' => $new]]);
+                app(GreenhouseCompleteness::class)->update($locked);
+            }
         });
     }
 }
