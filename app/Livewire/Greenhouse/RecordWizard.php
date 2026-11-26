@@ -6,6 +6,7 @@ use App\Models\CatalogItem;
 use App\Models\Greenhouse;
 use App\Services\GreenhouseRecordService;
 use App\Services\GreenhouseService;
+use App\Support\JalaliDate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -55,7 +56,7 @@ class RecordWizard extends Component
         foreach (['area_m2', 'address', 'latitude', 'longitude', 'altitude_m', 'structure_type_id', 'cultivation_type_id'] as $field) {
             $this->{$field} = (string) ($greenhouse->{$field} ?? '');
         }
-        $this->commissioned_on = $greenhouse->commissioned_on?->format('Y-m-d') ?? '';
+        $this->commissioned_on = $greenhouse->commissioned_on ? JalaliDate::fromGregorian($greenhouse->commissioned_on) : '';
         $items = DB::table('greenhouse_options')->join('catalog_items', 'catalog_items.id', '=', 'greenhouse_options.catalog_item_id')
             ->where('greenhouse_options.greenhouse_id', $greenhouse->id)->get(['catalog_items.type', 'catalog_items.id']);
         foreach ($items as $item) {
@@ -76,7 +77,7 @@ class RecordWizard extends Component
                 'name' => trim($this->name), 'area_m2' => $this->nullable($this->area_m2),
                 'address' => $this->nullable($this->address), 'latitude' => $this->nullable($this->latitude),
                 'longitude' => $this->nullable($this->longitude), 'altitude_m' => $this->nullable($this->altitude_m),
-                'commissioned_on' => $this->nullable($this->commissioned_on),
+                'commissioned_on' => $this->nullable($this->commissioned_on) === null ? null : JalaliDate::toGregorian($this->commissioned_on, 'commissioned_on'),
             ]);
         } elseif ($this->step === 2) {
             $records->saveStructure($greenhouse, $user, [

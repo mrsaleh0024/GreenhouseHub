@@ -32,15 +32,16 @@ class RecordWizardTest extends TestCase
         Livewire::actingAs($owner)->test(RecordWizard::class, ['greenhouse' => $greenhouse])
             ->set('name', 'گلخانه سبز')
             ->set('area_m2', '500')
+            ->set('commissioned_on', '۱۴۰۴/۰۱/۰۱')
             ->call('saveAndContinue')->assertHasNoErrors()->assertSet('step', 2)
             ->set('structure_type_id', (string) $structure->id)
             ->call('saveAndContinue')->assertHasNoErrors()->assertSet('step', 3)
             ->set('options.irrigation_type', [(string) $drip->id])
             ->call('saveAndContinue')->assertHasNoErrors()->assertSet('step', 4);
 
-        $this->assertDatabaseHas('greenhouses', ['id' => $greenhouse->id, 'name' => 'گلخانه سبز', 'structure_type_id' => $structure->id]);
+        $this->assertDatabaseHas('greenhouses', ['id' => $greenhouse->id, 'name' => 'گلخانه سبز', 'structure_type_id' => $structure->id, 'commissioned_on' => '2025-03-21 00:00:00']);
         $this->assertDatabaseHas('greenhouse_options', ['greenhouse_id' => $greenhouse->id, 'catalog_item_id' => $drip->id]);
-        Livewire::actingAs($owner)->test(RecordWizard::class, ['greenhouse' => $greenhouse->fresh()])->assertSet('name', 'گلخانه سبز');
+        Livewire::actingAs($owner)->test(RecordWizard::class, ['greenhouse' => $greenhouse->fresh()])->assertSet('name', 'گلخانه سبز')->assertSet('commissioned_on', '1404/01/01');
     }
 
     public function test_another_owner_cannot_open_or_edit_the_record_and_expert_cannot_edit(): void
