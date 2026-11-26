@@ -12,6 +12,7 @@ use App\Services\CustomerLinker;
 use App\Services\OtpService;
 use App\Support\Mobile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -72,10 +73,12 @@ class VerifyMobile extends Component
             return;
         }
 
-        $user->activate();
-        if ($user->primaryRole() === Role::GreenhouseOwner) {
-            app(CustomerLinker::class)->linkUserToCustomer($user);
-        }
+        DB::transaction(function () use ($user) {
+            $user->activate();
+            if ($user->primaryRole() === Role::GreenhouseOwner) {
+                app(CustomerLinker::class)->linkUserToCustomer($user);
+            }
+        });
         session()->forget('pending_mobile');
 
         // Admin-level accounts still have to pass the 2FA step at login.
