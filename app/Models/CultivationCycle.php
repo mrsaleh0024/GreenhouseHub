@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
+use App\Services\GreenhouseCompleteness;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CultivationCycle extends Model
 {
-    use SoftDeletes;
+    use \App\Models\Concerns\VisibleToUser, LogsActivity, SoftDeletes;
 
     protected $fillable = ['greenhouse_id', 'zone_id', 'crop_id', 'variety_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'harvest_ended_on', 'plant_count', 'planted_area_m2', 'status', 'total_yield_kg', 'notes'];
 
@@ -19,6 +21,14 @@ class CultivationCycle extends Model
 
     protected static function booted(): void
     {
+        $refresh = function (self $cycle) {
+            if ($greenhouse = $cycle->greenhouse()->first()) {
+                app(GreenhouseCompleteness::class)->update($greenhouse);
+            }
+        };
+        static::saved($refresh);
+        static::deleted($refresh);
+        static::restored($refresh);
         static::creating(fn (self $m) => $m->cycle_code ??= app(CodeGenerator::class)->next('cultivation_cycle', 'CC'));
         static::saving(fn (self $m) => $m->exists && $m->isDirty('cycle_code') ? throw new \LogicException('کد دوره قابل تغییر نیست.') : null);
     }

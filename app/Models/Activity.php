@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\VisibleToUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Activity extends Model
 {
+    use VisibleToUser;
+
     public $timestamps = false;
 
     protected $guarded = [];

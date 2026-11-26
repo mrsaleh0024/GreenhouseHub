@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
 use App\Support\PersianText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CatalogItem extends Model
 {
+    use LogsActivity;
+
     protected $fillable = ['type', 'parent_id', 'slug', 'label_fa', 'label_en', 'status', 'source', 'is_common', 'sort_order', 'meta', 'created_by'];
 
     protected function casts(): array
@@ -18,6 +21,9 @@ class CatalogItem extends Model
     protected static function booted(): void
     {
         static::saving(function (self $m) {
+            if ($m->exists && $m->getOriginal('status') === 'approved' && $m->isDirty('slug')) {
+                throw new \LogicException('شناسه گزینه تأییدشده قابل تغییر نیست.');
+            }
             $m->parent_key = $m->parent_id ?? 0;
             $m->normalized_label = PersianText::normalize($m->label_fa);
         });

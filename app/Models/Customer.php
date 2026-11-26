@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
 use App\Support\Mobile;
 use App\Support\PersianText;
 use Illuminate\Database\Eloquent\Model;
@@ -11,12 +12,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
 {
-    use SoftDeletes;
+    use \App\Models\Concerns\VisibleToUser, LogsActivity, SoftDeletes;
 
     protected $fillable = ['full_name', 'customer_type', 'company_name', 'national_id', 'mobile', 'phone', 'email', 'province_id', 'city_id', 'address', 'status', 'registered_via', 'notes'];
 
     protected static function booted(): void
     {
+        static::deleting(function (self $customer) {
+            if (! $customer->isForceDeleting() && $customer->greenhouses()->exists()) {
+                throw new \LogicException('مشتری دارای گلخانه را نمی‌توان حذف کرد.');
+            }
+        });
         static::creating(function (self $m) {
             $m->customer_code ??= app(CodeGenerator::class)->next('customer', 'CU');
         });

@@ -37,3 +37,9 @@ Registration, mobile verification, `User`, provider, seed orchestration, registr
 ## Known limitations and open questions
 
 Do not treat this increment as full Phase 1 acceptance: the FAIL/PARTIAL items above must be completed before production use.
+
+### Follow-up in progress (2026-11-26)
+
+Laravel Boost and its generated files were removed, and `AGENTS.md`, `CLAUDE.md`, `composer.json` and `composer.lock` restored to their `main` versions. The UI commit was reverted on this branch and preserved on `feature/light-theme`. The catalog now includes the specified lists and Persian labels. Initial visibility scopes, policies, model activity hooks, completeness calculation and catalog review/merge operations were added, but are not yet fully verified against the specification.
+
+The original 76-test suite passed after these changes; `DataFoundationProgressTest` adds four passing tests for catalog counts/idempotence, normalization, owner visibility, and classification coverage. The full required 25-item test matrix, full validation layer, enums, factories, demo records, option/equipment invariants, automatic completeness on all paths, concurrency safety, MariaDB round-trip evidence and complete report appendices remain unfinished. The checklist above has not been re-certified; do not interpret its earlier PASS entries as evidence of complete compliance.

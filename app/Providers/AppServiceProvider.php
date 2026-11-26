@@ -3,12 +3,16 @@
 namespace App\Providers;
 
 use App\Enums\Role;
+use App\Models\Activity;
 use App\Models\CatalogItem;
 use App\Models\CultivationCycle;
 use App\Models\Customer;
 use App\Models\Greenhouse;
 use App\Models\User;
 use App\Models\Zone;
+use App\Policies\ActivityPolicy;
+use App\Policies\CatalogItemPolicy;
+use App\Policies\DomainPolicy;
 use App\Services\Sms\LogSmsGateway;
 use App\Services\Sms\SmsGateway;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -33,5 +37,10 @@ class AppServiceProvider extends ServiceProvider
         // The super admin passes every gate/policy check.
         Gate::before(fn (User $user) => $user->hasRole(Role::SuperAdmin->value) ? true : null);
         Relation::morphMap(['customer' => Customer::class, 'greenhouse' => Greenhouse::class, 'zone' => Zone::class, 'cultivation_cycle' => CultivationCycle::class, 'catalog_item' => CatalogItem::class]);
+        foreach ([Customer::class, Greenhouse::class, Zone::class, CultivationCycle::class] as $model) {
+            Gate::policy($model, DomainPolicy::class);
+        }
+        Gate::policy(CatalogItem::class, CatalogItemPolicy::class);
+        Gate::policy(Activity::class, ActivityPolicy::class);
     }
 }

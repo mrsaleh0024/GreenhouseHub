@@ -7,9 +7,10 @@ class PersianText
     public static function normalize(string $value): string
     {
         $value = self::latinDigits($value);
-        $value = str_replace(['ي', 'ى', 'ك', '\u{200c}'], ['ی', 'ی', 'ک', ' '], $value);
+        $value = str_replace(['ي', 'ى', 'ك', 'ة', 'ۀ', 'ـ'], ['ی', 'ی', 'ک', 'ه', 'ه', ''], $value);
+        $value = mb_strtolower($value, 'UTF-8');
 
-        return preg_replace('/\s+/u', ' ', trim($value)) ?? '';
+        return preg_replace('/[\s\p{P}\p{S}\x{064B}-\x{065F}\x{0670}\x{200C}\x{200D}]+/u', '', $value) ?? '';
     }
 
     private static function latinDigits(string $v): string
