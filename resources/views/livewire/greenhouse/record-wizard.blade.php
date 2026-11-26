@@ -1,0 +1,64 @@
+<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+    <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-green-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">
+        <span aria-hidden="true">→</span> بازگشت به داشبورد
+    </a>
+
+    <div class="mt-7 grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-12">
+        <aside aria-label="مراحل تکمیل پرونده" class="lg:sticky lg:top-8 lg:self-start">
+            <p class="text-xs font-semibold text-green-700">پرونده {{ $greenhouse->greenhouse_code }}</p>
+            <h1 class="mt-3 text-2xl font-bold leading-10 text-gray-900">{{ $greenhouse->name }}</h1>
+            <p class="mt-2 text-sm leading-7 text-gray-600">لازم نیست همه اطلاعات را همین حالا وارد کنید. هر بخش جداگانه ذخیره می‌شود.</p>
+            <ol class="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1 lg:gap-3">
+                @foreach ([1 => 'اطلاعات پایه', 2 => 'ساختار و کشت', 3 => 'سامانه‌ها', 4 => 'ادامه پرونده'] as $number => $label)
+                    <li @if ($step === $number) aria-current="step" @endif class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm {{ $step === $number ? 'bg-green-700 font-semibold text-white' : 'text-gray-600' }}">
+                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full {{ $step === $number ? 'bg-white/20' : 'bg-white text-green-700' }}">{{ $number }}</span>
+                        <span>{{ $label }}</span>
+                    </li>
+                @endforeach
+            </ol>
+            <p class="mt-5 text-xs leading-6 text-gray-500">مرحله {{ $step }} از ۴</p>
+        </aside>
+
+        <section class="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8" aria-labelledby="step-heading">
+            @if ($saved)
+                <div role="status" class="mb-6 rounded-xl bg-green-50 px-4 py-3 text-sm leading-6 text-green-800">اطلاعات بخش قبل ذخیره شد.</div>
+            @endif
+            @if ($errors->any())
+                <div role="alert" class="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">برخی اطلاعات نیاز به بررسی دارند. پیام کنار هر بخش را ببینید.</div>
+            @endif
+
+            @if ($step === 1)
+                <p class="text-xs font-semibold text-green-700">بخش اول</p>
+                <h2 id="step-heading" class="mt-2 text-xl font-bold text-gray-900">با گلخانه شما آشنا شویم</h2>
+                <p class="mt-2 text-sm leading-7 text-gray-600">نام گلخانه برای شناسایی پرونده لازم است؛ بقیه موارد را هر زمان خواستید کامل کنید.</p>
+                <div class="mt-8 grid gap-6 sm:grid-cols-2">
+                    <div class="sm:col-span-2"><label for="record-name" class="block text-sm font-semibold text-gray-800">نام گلخانه <span class="text-red-700">*</span></label><input id="record-name" wire:model="name" aria-required="true" @error('name') aria-invalid="true" aria-describedby="name-error" @enderror class="mt-2 w-full rounded-xl border-gray-300 px-4 py-3 text-sm focus:border-green-600 focus:ring-green-600">@error('name') <p id="name-error" class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror</div>
+                    <div><label for="record-area" class="block text-sm font-semibold text-gray-800">مساحت گلخانه</label><div class="relative mt-2"><input id="record-area" type="number" min="0.01" step="0.01" inputmode="decimal" wire:model="area_m2" aria-describedby="area-hint" class="w-full rounded-xl border-gray-300 px-4 py-3 pe-20 text-sm focus:border-green-600 focus:ring-green-600"><span class="absolute inset-y-0 end-4 flex items-center text-xs text-gray-500">متر مربع</span></div><p id="area-hint" class="mt-2 text-xs leading-6 text-gray-500">مساحت تقریبی را هم می‌توانید ثبت کنید.</p>@error('area_m2') <p class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror</div>
+                    <div><label for="record-commissioned" class="block text-sm font-semibold text-gray-800">تاریخ شروع بهره‌برداری</label><input id="record-commissioned" type="date" wire:model="commissioned_on" dir="ltr" class="mt-2 w-full rounded-xl border-gray-300 px-4 py-3 text-sm focus:border-green-600 focus:ring-green-600"><p class="mt-2 text-xs leading-6 text-gray-500">اختیاری، به تاریخ میلادی</p>@error('commissioned_on') <p class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror</div>
+                    <div class="sm:col-span-2"><label for="record-address" class="block text-sm font-semibold text-gray-800">نشانی دقیق</label><textarea id="record-address" rows="3" wire:model="address" class="mt-2 w-full rounded-xl border-gray-300 px-4 py-3 text-sm focus:border-green-600 focus:ring-green-600" placeholder="نشانی، مسیر دسترسی یا نشانه‌ای نزدیک گلخانه"></textarea>@error('address') <p class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror</div>
+                </div>
+                <details class="mt-7 rounded-xl bg-gray-50 p-4"><summary class="cursor-pointer text-sm font-semibold text-gray-800">موقعیت جغرافیایی و ارتفاع <span class="font-normal text-gray-500">(اختیاری)</span></summary><p class="mt-3 text-xs leading-6 text-gray-600">اگر مختصات را می‌دانید، عرض و طول را با هم وارد کنید.</p><div class="mt-4 grid gap-4 sm:grid-cols-3">@foreach (['latitude' => 'عرض جغرافیایی', 'longitude' => 'طول جغرافیایی', 'altitude_m' => 'ارتفاع از سطح دریا (متر)'] as $field => $label)<div><label for="{{ $field }}" class="block text-xs font-semibold text-gray-700">{{ $label }}</label><input id="{{ $field }}" wire:model="{{ $field }}" dir="ltr" inputmode="decimal" class="mt-2 w-full rounded-lg border-gray-300 text-sm focus:border-green-600 focus:ring-green-600">@error($field) <p class="mt-2 text-xs text-red-700">{{ $message }}</p> @enderror</div>@endforeach</div></details>
+            @elseif ($step === 2)
+                <p class="text-xs font-semibold text-green-700">بخش دوم</p><h2 id="step-heading" class="mt-2 text-xl font-bold text-gray-900">ساختار و روش کشت</h2><p class="mt-2 text-sm leading-7 text-gray-600">اگر هنوز مطمئن نیستید، از این بخش عبور کنید و بعداً برگردید.</p>
+                @foreach (['structure_type' => ['structure_type_id', 'نوع سازه'], 'cultivation_type' => ['cultivation_type_id', 'روش کشت']] as $type => [$field, $label])
+                    <fieldset class="mt-8"><legend class="text-sm font-bold text-gray-900">{{ $label }}</legend><div class="mt-3 grid gap-3 sm:grid-cols-2">@foreach ($catalog->get($type, collect()) as $item)<label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 transition hover:bg-green-50 has-[:checked]:border-green-600 has-[:checked]:bg-green-50"><input type="radio" wire:model="{{ $field }}" value="{{ $item->id }}" class="border-gray-300 text-green-600 focus:ring-green-600"><span>{{ $item->label_fa }}</span></label>@endforeach</div>@error($field) <p class="mt-2 text-sm text-red-700">{{ $message }}</p> @enderror</fieldset>
+                @endforeach
+            @elseif ($step === 3)
+                <p class="text-xs font-semibold text-green-700">بخش سوم</p><h2 id="step-heading" class="mt-2 text-xl font-bold text-gray-900">سامانه‌های گلخانه</h2><p class="mt-2 text-sm leading-7 text-gray-600">هر تعداد گزینه مرتبط را انتخاب کنید. اگر سیستمی ندارید، فقط «ندارد» را انتخاب کنید.</p>
+                @foreach (['irrigation_type' => 'آبیاری', 'heating_system' => 'گرمایش', 'cooling_system' => 'سرمایش', 'water_source' => 'منبع آب', 'ventilation_system' => 'تهویه'] as $type => $label)
+                    <fieldset class="mt-7 rounded-xl border border-gray-200 p-4 sm:p-5"><legend class="px-2 text-sm font-bold text-gray-900">{{ $label }}</legend><div class="grid gap-3 sm:grid-cols-2">@foreach ($catalog->get($type, collect()) as $item)<label class="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-sm leading-6 text-gray-700 hover:bg-gray-50"><input type="checkbox" wire:model="options.{{ $type }}" value="{{ $item->id }}" class="mt-1 rounded border-gray-300 text-green-600 focus:ring-green-600"><span>{{ $item->label_fa }}</span></label>@endforeach</div></fieldset>
+                @endforeach
+                @error('options') <p class="mt-4 text-sm text-red-700">{{ $message }}</p> @enderror
+            @else
+                <div class="py-4"><span aria-hidden="true" class="grid h-12 w-12 place-items-center rounded-full bg-green-50 text-xl font-bold text-green-700">✓</span><h2 id="step-heading" class="mt-5 text-2xl font-bold text-gray-900">این بخش‌ها ذخیره شدند</h2><p class="mt-3 max-w-lg text-sm leading-7 text-gray-600">هر زمان بخواهید می‌توانید برای تکمیل یا اصلاح اطلاعات غیرکلیدی برگردید. بخش‌های دیگر پرونده را از داشبورد دنبال کنید.</p><a href="{{ route('dashboard') }}" class="mt-7 inline-flex rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">بازگشت به داشبورد</a></div>
+            @endif
+
+            @if ($step < 4)
+                <div class="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 pt-6">
+                    @if ($step > 1)<button type="button" wire:click="previous" class="rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-700">مرحله قبل</button>@else <span class="text-xs text-gray-500">* اطلاعات ضروری</span> @endif
+                    <button type="button" wire:click="saveAndContinue" wire:loading.attr="disabled" wire:target="saveAndContinue" class="inline-flex items-center gap-2 rounded-xl bg-green-700 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700 disabled:opacity-60"><span wire:loading.remove wire:target="saveAndContinue">ذخیره و ادامه</span><span wire:loading wire:target="saveAndContinue">در حال ذخیره...</span><span aria-hidden="true">←</span></button>
+                </div>
+            @endif
+        </section>
+    </div>
+</div>

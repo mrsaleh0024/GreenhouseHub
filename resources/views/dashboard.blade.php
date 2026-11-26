@@ -1,18 +1,40 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h1 class="text-xl font-bold text-gray-800">داشبورد</h1>
-    </x-slot>
-
-    <div class="py-8">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="rounded-xl bg-white p-6 shadow-sm">
-                <p class="text-lg font-semibold text-gray-800">
-                    {{ auth()->user()->name }}، خوش آمدید 👋
-                </p>
-                <p class="mt-1 text-sm text-gray-500">
-                    نقش شما: <span class="font-medium text-green-700">{{ auth()->user()->primaryRole()?->label() }}</span>
-                </p>
+    <div class="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-5">
+            <div>
+                <p class="text-sm font-semibold text-green-700">فضای کار شما</p>
+                <h1 class="mt-2 text-2xl font-bold leading-10 text-gray-900 sm:text-3xl">{{ auth()->user()->name }}، خوش آمدید</h1>
+                <p class="mt-2 text-sm leading-7 text-gray-600">@if ($isOwner) اطلاعات گلخانه‌تان را از همین‌جا دنبال کنید. @elseif ($isExpert) اطلاعات فنی گلخانه‌ها را در این بخش دنبال کنید. @else وضعیت پرونده‌های گلخانه را اینجا دنبال کنید. @endif</p>
             </div>
+            <span class="rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-green-700">{{ auth()->user()->primaryRole()?->label() }}</span>
         </div>
+
+        @if ($isOwner && $records->isNotEmpty())
+            @php($first = $records->first())
+            <section aria-labelledby="next-action" class="mt-9 overflow-hidden rounded-2xl bg-green-700 text-white">
+                <div class="grid gap-6 p-6 sm:p-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div><p class="text-xs font-semibold text-white/80">پرونده گلخانه</p><h2 id="next-action" class="mt-3 text-xl font-bold leading-9">{{ $first->completeness_percent < 100 ? 'پرونده‌تان را قدم‌به‌قدم کامل کنید' : 'پرونده شما آماده است' }}</h2><p class="mt-2 max-w-xl text-sm leading-7 text-white/80">اطلاعات هر بخش ذخیره می‌شود و می‌توانید در زمان مناسب ادامه دهید.</p></div>
+                    <a href="{{ route('greenhouses.complete', $first) }}" class="inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-white px-5 py-3 text-sm font-bold text-green-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{{ $first->completeness_percent < 100 ? 'ادامه تکمیل پرونده' : 'ویرایش اطلاعات' }} <span aria-hidden="true">←</span></a>
+                </div>
+            </section>
+        @endif
+
+        <section aria-labelledby="records-heading" class="mt-10">
+            <div class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-xs font-semibold text-green-700">پرونده دیجیتال</p><h2 id="records-heading" class="mt-2 text-xl font-bold text-gray-900">{{ $isOwner ? 'گلخانه‌های من' : 'گلخانه‌ها' }}</h2></div><p class="text-xs text-gray-600">{{ $records->total() }} پرونده</p></div>
+
+            @forelse ($records as $record)
+                <article class="mt-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
+                    <div class="flex flex-wrap items-start justify-between gap-4"><div><p dir="ltr" class="text-right text-xs font-semibold tracking-wide text-green-700">{{ $record->greenhouse_code }}</p><h3 class="mt-2 text-lg font-bold text-gray-900">{{ $record->name }}</h3><p class="mt-1 text-sm text-gray-600">@if ($record->area_m2) {{ number_format((float) $record->area_m2, 0) }} متر مربع @else مساحت هنوز ثبت نشده است @endif</p></div><span class="rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">{{ $record->status === 'active' ? 'فعال' : ($record->status === 'under_construction' ? 'در حال ساخت' : 'غیرفعال') }}</span></div>
+                    @if (! $isExpert)
+                        <div class="mt-6 flex flex-wrap items-end justify-between gap-5 border-t border-gray-200 pt-5"><div class="w-full max-w-sm"><div class="flex justify-between gap-4 text-xs font-semibold text-gray-700"><span>تکمیل پرونده</span><span>{{ $record->completeness_percent }}٪</span></div><progress class="record-progress mt-3 w-full" max="100" value="{{ $record->completeness_percent }}" aria-label="میزان تکمیل پرونده {{ $record->name }}">{{ $record->completeness_percent }}%</progress><p class="mt-2 text-xs leading-6 text-gray-500">این میزان با اضافه‌شدن جزئیات و سوابق پرونده به‌روزرسانی می‌شود.</p></div><a href="{{ route('greenhouses.complete', $record) }}" class="inline-flex items-center gap-2 text-sm font-bold text-green-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">{{ $record->completeness_percent < 100 ? 'تکمیل اطلاعات' : 'مشاهده و ویرایش' }} <span aria-hidden="true">←</span></a></div>
+                    @else
+                        <p class="mt-5 border-t border-gray-200 pt-4 text-xs leading-6 text-gray-500">دسترسی شما به اطلاعات این گلخانه فقط برای مشاهده است.</p>
+                    @endif
+                </article>
+            @empty
+                <div class="mt-4 rounded-2xl border border-gray-200 bg-white px-6 py-10"><div class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-green-700" aria-hidden="true"><svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11 12 3l9 8v9H3v-9Zm4 0v9m10-9v9M3 14h18" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3 class="mt-5 text-base font-bold text-gray-900">هنوز پرونده‌ای در دسترس نیست</h3><p class="mt-2 max-w-lg text-sm leading-7 text-gray-600">@if ($isOwner) اگر تازه حساب ساخته‌اید، پس از تأیید شماره موبایل پرونده شما به حسابتان متصل می‌شود. اگر همچنان آن را نمی‌بینید با پشتیبانی تماس بگیرید. @else در حال حاضر گلخانه‌ای برای نمایش وجود ندارد. @endif</p></div>
+            @endforelse
+            <div class="mt-6">{{ $records->links() }}</div>
+        </section>
     </div>
 </x-app-layout>

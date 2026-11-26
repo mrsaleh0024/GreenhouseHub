@@ -14,3 +14,20 @@
 [x-cloak] {
     display: none !important;
 }
+
+.record-progress {
+    height: 0.5rem;
+    overflow: hidden;
+    border: 0;
+    border-radius: 9999px;
+    background: rgb(var(--theme-primary) / 0.12);
+    accent-color: rgb(var(--theme-primary));
+}
+
+.record-progress::-webkit-progress-bar { background: rgb(var(--theme-primary) / 0.12); }
+.record-progress::-webkit-progress-value { background: rgb(var(--theme-primary)); border-radius: 9999px; }
+.record-progress::-moz-progress-bar { background: rgb(var(--theme-primary)); border-radius: 9999px; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; }
+}

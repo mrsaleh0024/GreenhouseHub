@@ -12,7 +12,7 @@ class StackCheckTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('GreenhouseHub')
+            ->assertSee('رویش')
             ->assertSee('مدیریت یکپارچه گلخانه')
             ->assertSee('ایجاد حساب کاربری');
     }
