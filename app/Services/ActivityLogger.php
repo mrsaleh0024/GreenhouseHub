@@ -6,19 +6,20 @@ use App\Models\Activity;
 use App\Models\CultivationCycle;
 use App\Models\Customer;
 use App\Models\Greenhouse;
+use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Database\Eloquent\Model;
 
 class ActivityLogger
 {
-    public function log(Model $subject, string $event, array $changes = [], ?string $description = null): Activity
+    public function log(Model $subject, string $event, array $changes = [], ?string $description = null, ?User $actor = null): Activity
     {
         $greenhouse = match (true) {
             $subject instanceof Greenhouse => $subject,
             $subject instanceof Zone, $subject instanceof CultivationCycle => $subject->greenhouse()->withTrashed()->first(),
             default => null,
         };
-        $actor = auth()->user();
+        $actor ??= auth()->user();
 
         return Activity::create([
             'actor_id' => $actor?->id, 'actor_role' => $actor?->primaryRole()?->value,
