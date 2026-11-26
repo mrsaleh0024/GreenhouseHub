@@ -18,6 +18,25 @@ class RecordWizardTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_only_manager_can_correct_location_and_city_must_belong_to_province(): void
+    {
+        $this->withoutVite();
+        $this->seed([RoleSeeder::class, CatalogSeeder::class]);
+        $admin = User::factory()->role(Role::Admin)->create();
+        $owner = User::factory()->role(Role::GreenhouseOwner)->create();
+        $customer = Customer::create(['full_name' => 'مشتری', 'mobile' => '09123456789']);
+        $customer->users()->attach($owner);
+        $greenhouse = Greenhouse::create(['customer_id' => $customer->id, 'name' => 'گلخانه']);
+        $city = CatalogItem::where('type', 'city')->firstOrFail();
+        $otherProvince = CatalogItem::where('type', 'province')->whereKeyNot($city->parent_id)->firstOrFail();
+        Livewire::actingAs($owner)->test(RecordWizard::class, ['greenhouse' => $greenhouse])
+            ->set('provinceId', (string) $city->parent_id)->set('cityId', (string) $city->id)->call('correctLocation')->assertForbidden();
+        Livewire::actingAs($admin)->test(RecordWizard::class, ['greenhouse' => $greenhouse])
+            ->set('provinceId', (string) $otherProvince->id)->set('cityId', (string) $city->id)->call('correctLocation')->assertHasErrors('city_id')
+            ->set('provinceId', (string) $city->parent_id)->set('cityId', (string) $city->id)->call('correctLocation')->assertHasNoErrors();
+        $this->assertDatabaseHas('greenhouses', ['id' => $greenhouse->id, 'province_id' => $city->parent_id, 'city_id' => $city->id]);
+    }
+
     public function test_owner_can_request_a_key_information_correction(): void
     {
         $this->withoutVite();

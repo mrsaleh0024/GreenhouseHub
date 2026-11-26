@@ -62,6 +62,21 @@ class RecordWizard extends Component
 
     public bool $showCorrection = false;
 
+    public string $provinceId = '';
+
+    public string $cityId = '';
+
+    public function updatedProvinceId(): void
+    {
+        $this->cityId = '';
+    }
+
+    public function correctLocation(GreenhouseRecordService $records): void
+    {
+        $records->correctLocation($this->record(), auth()->user(), ['province_id' => $this->provinceId, 'city_id' => $this->cityId]);
+        $this->customNotice = 'موقعیت اصلی گلخانه اصلاح شد.';
+    }
+
     public function requestCorrection(CorrectionRequestService $service): void
     {
         $this->resetErrorBag();
@@ -82,6 +97,8 @@ class RecordWizard extends Component
         $requestedStep = (int) request()->query('step', 1);
         $this->step = in_array($requestedStep, [1, 2, 3], true) ? $requestedStep : 1;
         $greenhouse = $this->record();
+        $this->provinceId = (string) ($greenhouse->province_id ?? '');
+        $this->cityId = (string) ($greenhouse->city_id ?? '');
         $this->name = $greenhouse->name;
         foreach (['area_m2', 'address', 'latitude', 'longitude', 'altitude_m', 'structure_type_id', 'cultivation_type_id'] as $field) {
             $this->{$field} = (string) ($greenhouse->{$field} ?? '');
@@ -189,6 +206,10 @@ class RecordWizard extends Component
             ? CorrectionRequest::where('greenhouse_id', $greenhouse->id)->whereNull('cultivation_cycle_id')->where('requested_by', auth()->id())->latest()->limit(10)->get()
             : collect();
 
-        return view('livewire.greenhouse.record-wizard', ['greenhouse' => $greenhouse, 'catalog' => $catalog, 'corrections' => $corrections]);
+        $manager = auth()->user()->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value]);
+        $provinces = $manager ? CatalogItem::where('type', 'province')->where('status', 'approved')->orderBy('label_fa')->get() : collect();
+        $cities = $manager && $this->provinceId !== '' ? CatalogItem::where('type', 'city')->where('status', 'approved')->where('parent_id', $this->provinceId)->orderBy('label_fa')->get() : collect();
+
+        return view('livewire.greenhouse.record-wizard', ['greenhouse' => $greenhouse, 'catalog' => $catalog, 'corrections' => $corrections, 'provinces' => $provinces, 'cities' => $cities]);
     }
 }

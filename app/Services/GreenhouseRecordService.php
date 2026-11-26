@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Role;
 use App\Models\Greenhouse;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -11,6 +12,16 @@ use Illuminate\Validation\ValidationException;
 
 class GreenhouseRecordService
 {
+    public function correctLocation(Greenhouse $greenhouse, User $user, array $data): void
+    {
+        abort_unless($user->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value]), 403);
+        $values = Validator::make($data, [
+            'province_id' => ['required', 'integer', Rule::exists('catalog_items', 'id')->where('type', 'province')->where('status', 'approved')],
+            'city_id' => ['required', 'integer', Rule::exists('catalog_items', 'id')->where('type', 'city')->where('status', 'approved')->where('parent_id', $data['province_id'] ?? null)],
+        ], ['required' => 'استان و شهر را انتخاب کنید.', 'exists' => 'استان و شهر انتخاب‌شده معتبر نیستند.'])->validate();
+        $greenhouse->fill($values)->save();
+    }
+
     public function saveBasics(Greenhouse $greenhouse, User $user, array $data): void
     {
         Gate::forUser($user)->authorize('update', $greenhouse);
