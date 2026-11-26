@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class CatalogService
@@ -94,20 +95,34 @@ class CatalogService
     public function approve(CatalogItem $item, User $admin, ?string $slug = null, ?string $labelEn = null): void
     {
         Gate::forUser($admin)->authorize('approve', $item);
-        if ($item->status !== 'pending' || ($slug !== null && ! preg_match('/^[a-z0-9]+(?:_[a-z0-9]+)*$/', $slug))) {
-            throw ValidationException::withMessages(['status' => 'آیتم یا شناسه معتبر نیست.']);
-        }
-        $item->forceFill(['slug' => $slug ?? $item->slug, 'label_en' => $labelEn, 'status' => 'approved', 'reviewed_by' => $admin->id, 'reviewed_at' => now()])->save();
-        app(ActivityLogger::class)->log($item, 'catalog_approved', actor: $admin);
+        DB::transaction(function () use ($item, $admin, $slug, $labelEn) {
+            $locked = CatalogItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'pending') {
+                throw ValidationException::withMessages(['item' => 'این گزینه در انتظار بررسی نیست.']);
+            }
+            $values = Validator::make(['slug' => $slug, 'label_en' => $labelEn], [
+                'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:_[a-z0-9]+)*$/', Rule::unique('catalog_items', 'slug')->where('type', $locked->type)->ignore($locked->id)],
+                'label_en' => ['nullable', 'string', 'max:150'],
+            ], [
+                'slug.regex' => 'شناسه انگلیسی باید با حروف کوچک، عدد و زیرخط نوشته شود.',
+                'slug.unique' => 'این شناسه قبلاً در همین فهرست استفاده شده است.',
+                'slug.max' => 'شناسه انگلیسی بیش از حد طولانی است.',
+            ])->validate();
+            $locked->forceFill(['slug' => $values['slug'] ?? $locked->slug, 'label_en' => $values['label_en'] ?? null, 'status' => 'approved', 'reviewed_by' => $admin->id, 'reviewed_at' => now()])->save();
+            app(ActivityLogger::class)->log($locked, 'catalog_approved', actor: $admin);
+        }, 3);
     }
 
     public function reject(CatalogItem $item, User $admin): void
     {
         Gate::forUser($admin)->authorize('reject', $item);
-        if ($item->status !== 'pending' || $this->usageCount($item)) {
-            throw ValidationException::withMessages(['item' => 'آیتم مورد استفاده را نمی‌توان حذف کرد.']);
-        }
-        $item->delete();
+        DB::transaction(function () use ($item) {
+            $locked = CatalogItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'pending' || $this->usageCount($locked)) {
+                throw ValidationException::withMessages(['item' => 'گزینه مورد استفاده را نمی‌توان حذف کرد؛ در صورت نیاز آن را ادغام کنید.']);
+            }
+            $locked->delete();
+        }, 3);
     }
 
     public function equipmentConflicts(CatalogItem $from, CatalogItem $into, User $admin): Collection

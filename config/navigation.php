@@ -15,6 +15,7 @@ return [
     'items' => [
         ['label' => 'داشبورد', 'route' => 'dashboard', 'roles' => null],
         ['label' => 'درخواست‌های اصلاح', 'route' => 'admin.corrections', 'roles' => ['admin', 'super_admin']],
+        ['label' => 'گزینه‌های پیشنهادی', 'route' => 'admin.catalog', 'roles' => ['admin', 'super_admin']],
         ['label' => 'مدیریت مدیران', 'route' => 'admin.admins', 'roles' => ['super_admin']],
     ],
 ];
