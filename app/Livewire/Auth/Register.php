@@ -7,9 +7,11 @@ use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Exceptions\OtpSendException;
 use App\Livewire\Concerns\HasFarsiValidation;
+use App\Models\CatalogItem;
 use App\Models\User;
+use App\Services\CatalogService;
 use App\Services\OtpService;
-use App\Support\IranProvinces;
+use App\Services\OwnerRegistrationService;
 use App\Support\Mobile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -28,18 +30,25 @@ class Register extends Component
 
     // Common
     public string $name = '';
+
     public string $mobile = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
 
     // Greenhouse owner
     public string $greenhouse_name = '';
-    public string $province = '';
+
+    public string $province_id = '';
+
     public string $city = '';
 
     // Expert
     public string $specialty = '';
+
     public string $license_number = '';
+
     public string $experience_years = '';
 
     public function register(OtpService $otp): void
@@ -77,7 +86,7 @@ class Register extends Component
         }
 
         DB::transaction(function () use ($existing, $role) {
-            $user = $existing ?? new User();
+            $user = $existing ?? new User;
             $user->fill([
                 'name' => trim($this->name),
                 'mobile' => $this->mobile,
@@ -93,13 +102,9 @@ class Register extends Component
 
             if ($role === Role::GreenhouseOwner) {
                 $user->expertProfile()->delete();
-                $user->ownerProfile()->updateOrCreate([], [
-                    'greenhouse_name' => trim($this->greenhouse_name),
-                    'province' => $this->province,
-                    'city' => trim($this->city),
-                ]);
+                $city = app(CatalogService::class)->findOrCreateCustom('city', trim($this->city), $user, (int) $this->province_id);
+                app(OwnerRegistrationService::class)->register($user, ['greenhouse_name' => trim($this->greenhouse_name), 'province_id' => (int) $this->province_id, 'city_id' => $city->id]);
             } else {
-                $user->ownerProfile()->delete();
                 $user->expertProfile()->updateOrCreate([], [
                     'specialty' => trim($this->specialty),
                     'license_number' => trim($this->license_number) ?: null,
@@ -140,7 +145,7 @@ class Register extends Component
         $specific = $role === Role::GreenhouseOwner
             ? [
                 'greenhouse_name' => ['required', 'string', 'max:120'],
-                'province' => ['required', Rule::in(IranProvinces::all())],
+                'province_id' => ['required', 'integer', Rule::exists('catalog_items', 'id')->where('type', 'province')->where('status', 'approved')],
                 'city' => ['required', 'string', 'max:80'],
             ]
             : [
@@ -156,7 +161,7 @@ class Register extends Component
     {
         // The registration card is wider than the other guest screens.
         return view('livewire.auth.register', [
-            'provinces' => IranProvinces::all(),
+            'provinces' => CatalogItem::where('type', 'province')->where('status', 'approved')->orderBy('sort_order')->get(),
         ])->layout('layouts.guest', ['maxWidth' => 'max-w-2xl']);
     }
 }

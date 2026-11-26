@@ -5,6 +5,7 @@ namespace Tests\Concerns;
 use App\Enums\Role;
 use App\Models\User;
 use App\Services\Sms\SmsGateway;
+use Database\Seeders\CatalogSeeder;
 use Database\Seeders\RoleSeeder;
 use Tests\Support\FakeSmsGateway;
 
@@ -18,8 +19,9 @@ trait InteractsWithAuth
         $this->withoutVite();
 
         $this->seed(RoleSeeder::class);
+        $this->seed(CatalogSeeder::class);
 
-        $this->sms = new FakeSmsGateway();
+        $this->sms = new FakeSmsGateway;
         $this->app->instance(SmsGateway::class, $this->sms);
     }
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\Role;
 use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -45,9 +46,14 @@ class User extends Authenticatable
         return $this->hasOne(ExpertProfile::class);
     }
 
-    public function ownerProfile(): HasOne
+    public function customers(): BelongsToMany
     {
-        return $this->hasOne(OwnerProfile::class);
+        return $this->belongsToMany(Customer::class)->withPivot('is_primary')->withTimestamps();
+    }
+
+    public function customer(): ?Customer
+    {
+        return $this->customers()->wherePivot('is_primary', true)->first() ?? $this->customers()->first();
     }
 
     public function isMobileVerified(): bool

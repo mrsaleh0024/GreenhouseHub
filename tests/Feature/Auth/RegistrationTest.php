@@ -6,8 +6,11 @@ use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Livewire\Auth\Register;
 use App\Livewire\Auth\VerifyMobile;
+use App\Models\CatalogItem;
+use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\Concerns\InteractsWithAuth;
 use Tests\TestCase;
@@ -23,7 +26,7 @@ class RegistrationTest extends TestCase
         $this->setUpAuth();
     }
 
-    private function fillOwner(\Livewire\Features\SupportTesting\Testable $c, string $mobile = '09123456789'): \Livewire\Features\SupportTesting\Testable
+    private function fillOwner(Testable $c, string $mobile = '09123456789'): Testable
     {
         return $c->set('role', 'greenhouse_owner')
             ->set('name', 'علی رضایی')
@@ -31,7 +34,7 @@ class RegistrationTest extends TestCase
             ->set('password', 'Password1')
             ->set('password_confirmation', 'Password1')
             ->set('greenhouse_name', 'گلخانه سبز')
-            ->set('province', 'تهران')
+            ->set('province_id', CatalogItem::where('type', 'province')->where('slug', 'tehran')->value('id'))
             ->set('city', 'ورامین');
     }
 
@@ -52,7 +55,7 @@ class RegistrationTest extends TestCase
         $this->assertSame(UserStatus::Pending, $user->status);
         $this->assertNull($user->mobile_verified_at);
         $this->assertTrue($user->hasRole(Role::GreenhouseOwner->value));
-        $this->assertSame('گلخانه سبز', $user->ownerProfile->greenhouse_name);
+        $this->assertSame('گلخانه سبز', Customer::where('mobile', $user->mobile)->firstOrFail()->greenhouses->first()->name);
         $this->assertNull($user->expertProfile);
         $this->assertNotNull($this->sms->lastCode('09123456789'));
     }
@@ -95,9 +98,9 @@ class RegistrationTest extends TestCase
     {
         $this->fillOwner(Livewire::test(Register::class))
             ->set('greenhouse_name', '')
-            ->set('province', 'جایی که وجود ندارد')
+            ->set('province_id', 999999)
             ->call('register')
-            ->assertHasErrors(['greenhouse_name', 'province']);
+            ->assertHasErrors(['greenhouse_name', 'province_id']);
 
         Livewire::test(Register::class)
             ->set('role', 'expert')

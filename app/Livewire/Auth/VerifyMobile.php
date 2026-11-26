@@ -3,10 +3,12 @@
 namespace App\Livewire\Auth;
 
 use App\Enums\OtpPurpose;
+use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Exceptions\OtpSendException;
 use App\Livewire\Concerns\HasFarsiValidation;
 use App\Models\User;
+use App\Services\CustomerLinker;
 use App\Services\OtpService;
 use App\Support\Mobile;
 use Illuminate\Support\Facades\Auth;
@@ -71,6 +73,9 @@ class VerifyMobile extends Component
         }
 
         $user->activate();
+        if ($user->primaryRole() === Role::GreenhouseOwner) {
+            app(CustomerLinker::class)->linkUserToCustomer($user);
+        }
         session()->forget('pending_mobile');
 
         // Admin-level accounts still have to pass the 2FA step at login.
