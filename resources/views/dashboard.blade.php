@@ -1,5 +1,10 @@
 <x-app-layout>
     <div class="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12 lg:px-8">
+        @if (session('greenhouse_notice'))
+            <div role="status" class="mb-6 flex items-start gap-3 rounded-2xl border border-green-700/20 bg-green-50 p-5 text-sm leading-7 text-green-800">
+                <x-line-icon name="clipboard" /><p>{{ session('greenhouse_notice') }}</p>
+            </div>
+        @endif
         <div class="flex flex-wrap items-end justify-between gap-5">
             <div>
                 <p class="flex items-center gap-2 text-sm font-semibold text-green-700"><x-line-icon name="greenhouse" /> فضای کار شما</p>

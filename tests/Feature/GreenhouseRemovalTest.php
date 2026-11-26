@@ -31,6 +31,7 @@ class GreenhouseRemovalTest extends TestCase
         $component = Livewire::actingAs($owner)->test(RecordRemoval::class, ['greenhouseId' => $record->id])->call('confirmFirst');
         $this->travel(4)->seconds();
         $component->call('remove')->assertRedirect(route('dashboard'));
+        $this->assertStringContainsString('با موفقیت حذف شد', session('greenhouse_notice'));
         $this->assertSoftDeleted($record);
         $this->assertFalse(Greenhouse::visibleTo($owner)->whereKey($record->id)->exists());
         $this->actingAs($owner)->post(route('greenhouses.restore', $record->id))->assertForbidden();

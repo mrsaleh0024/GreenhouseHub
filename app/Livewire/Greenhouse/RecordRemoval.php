@@ -41,6 +41,7 @@ class RecordRemoval extends Component
             $record->save();
             app(ActivityLogger::class)->log($record, 'deleted');
         });
+        session()->flash('greenhouse_notice', 'گلخانه با موفقیت حذف شد. برای بازیابی پرونده می‌توانید با مدیر تماس بگیرید.');
         $this->redirectRoute('dashboard', navigate: true);
     }
 
