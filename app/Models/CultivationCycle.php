@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\TracksActors;
+use App\Models\Concerns\VisibleToUser;
 use App\Services\GreenhouseCompleteness;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CultivationCycle extends Model
 {
-    use \App\Models\Concerns\VisibleToUser, LogsActivity, SoftDeletes;
+    use LogsActivity, SoftDeletes, TracksActors, VisibleToUser;
 
     protected $fillable = ['greenhouse_id', 'zone_id', 'crop_id', 'variety_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'harvest_ended_on', 'plant_count', 'planted_area_m2', 'status', 'total_yield_kg', 'notes'];
 

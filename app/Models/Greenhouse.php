@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\TracksActors;
+use App\Models\Concerns\VisibleToUser;
 use App\Services\GreenhouseCompleteness;
 use App\Support\PersianText;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Greenhouse extends Model
 {
-    use \App\Models\Concerns\VisibleToUser, LogsActivity, SoftDeletes;
+    use LogsActivity, SoftDeletes, TracksActors, VisibleToUser;
 
     protected $fillable = ['customer_id', 'responsible_expert_id', 'name', 'province_id', 'city_id', 'address', 'latitude', 'longitude', 'altitude_m', 'area_m2', 'structure_type_id', 'cultivation_type_id', 'commissioned_on', 'status', 'notes'];
 

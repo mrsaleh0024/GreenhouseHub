@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use App\Models\Concerns\TracksActors;
 use App\Models\Concerns\VisibleToUser;
 use App\Services\GreenhouseCompleteness;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Zone extends Model
 {
-    use LogsActivity, SoftDeletes, VisibleToUser;
+    use LogsActivity, SoftDeletes, TracksActors, VisibleToUser;
 
     protected $fillable = ['greenhouse_id', 'name', 'zone_type_id', 'area_m2', 'capacity_plants', 'status', 'notes'];
 
