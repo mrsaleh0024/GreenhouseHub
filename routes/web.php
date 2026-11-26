@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Livewire\Actions\Logout;
 use App\Livewire\Admin\AdminManager;
+use App\Livewire\Admin\CorrectionInbox;
 use App\Livewire\Auth\ActivateAccount;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
@@ -32,6 +33,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/greenhouses/{greenhouse}/complete', RecordWizard::class)->name('greenhouses.complete');
     Route::get('/greenhouses/{greenhouse}/cultivation', Cultivation::class)->name('greenhouses.cultivation');
+    Route::get('/admin/correction-requests', CorrectionInbox::class)->name('admin.corrections');
 
     Route::post('/logout', function (Logout $logout) {
         $logout();

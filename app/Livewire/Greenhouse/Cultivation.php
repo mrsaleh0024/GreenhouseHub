@@ -2,13 +2,16 @@
 
 namespace App\Livewire\Greenhouse;
 
+use App\Enums\Role;
 use App\Models\CatalogItem;
+use App\Models\CorrectionRequest;
 use App\Models\CultivationCycle;
 use App\Models\Greenhouse;
 use App\Models\Zone;
 use App\Services\CorrectionRequestService;
 use App\Services\CultivationCycleService;
 use App\Support\JalaliDate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -28,6 +31,9 @@ class Cultivation extends Component
 
     #[Locked]
     public ?int $editingId = null;
+
+    #[Locked]
+    public bool $editingClosed = false;
 
     #[Locked]
     public ?int $finishId = null;
@@ -86,6 +92,11 @@ class Cultivation extends Component
         foreach (['planting_date', 'expected_harvest_date', 'harvest_started_on'] as $field) {
             $this->{$field} = $cycle->{$field} ? JalaliDate::fromGregorian($cycle->{$field}) : '';
         }
+        if ($cycle->harvest_ended_on && auth()->user()->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value])) {
+            $this->editingClosed = true;
+            $this->end_date = JalaliDate::fromGregorian($cycle->harvest_ended_on);
+            $this->yield_kg = (string) ($cycle->total_yield_kg ?? '');
+        }
         $this->showForm = true;
     }
 
@@ -95,14 +106,27 @@ class Cultivation extends Component
         Gate::authorize('manageCycles', $greenhouse);
         $cycle = $this->editingId ? $this->cycle($this->editingId) : null;
         $this->resetErrorBag();
-        $service->save($greenhouse, auth()->user(), [
+        $data = [
             'crop_id' => $this->nullable($this->crop_id), 'zone_id' => $this->nullable($this->zone_id),
             'substrate_id' => $this->nullable($this->substrate_id), 'plant_count' => $this->nullable($this->plant_count),
             'planted_area_m2' => $this->nullable($this->planted_area_m2),
             'planting_date' => $this->jalali($this->planting_date, 'planting_date'),
             'expected_harvest_date' => $this->jalali($this->expected_harvest_date, 'expected_harvest_date'),
             'harvest_started_on' => $this->jalali($this->harvest_started_on, 'harvest_started_on'),
-        ], $cycle);
+        ];
+        $correctEnd = $cycle && $cycle->harvest_ended_on && auth()->user()->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value]);
+        $endDate = $correctEnd ? $this->jalali($this->end_date, 'end_date') : null;
+        if ($correctEnd && $endDate === null) {
+            $this->addError('end_date', 'تاریخ پایان برداشت را وارد کنید.');
+
+            return;
+        }
+        DB::transaction(function () use ($service, $greenhouse, $cycle, $data, $correctEnd, $endDate) {
+            if ($correctEnd) {
+                $service->correctClosedHarvest($greenhouse, $cycle, auth()->user(), $endDate, $this->nullable($this->yield_kg));
+            }
+            $service->save($greenhouse, auth()->user(), $data, $cycle);
+        });
         $this->resetForm();
         $this->notice = 'اطلاعات کشت ذخیره شد.';
     }
@@ -174,7 +198,7 @@ class Cultivation extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['editingId', 'finishId', 'correctionId', 'showForm', 'crop_id', 'zone_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'plant_count', 'planted_area_m2', 'end_date', 'yield_kg', 'correction_details', 'notice']);
+        $this->reset(['editingId', 'editingClosed', 'finishId', 'correctionId', 'showForm', 'crop_id', 'zone_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'plant_count', 'planted_area_m2', 'end_date', 'yield_kg', 'correction_details', 'notice']);
         $this->resetErrorBag();
     }
 
@@ -208,9 +232,15 @@ class Cultivation extends Component
             ->with(['crop:id,label_fa', 'zone:id,name'])->orderByDesc('planting_date')->orderByDesc('id')->paginate(12);
         $catalog = CatalogItem::whereIn('type', ['crop', 'substrate'])->where('status', 'approved')
             ->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->get()->groupBy('type');
+        $corrections = collect();
+        if (auth()->user()->hasRole(Role::GreenhouseOwner->value)) {
+            $corrections = CorrectionRequest::where('greenhouse_id', $greenhouse->id)
+                ->where('requested_by', auth()->id())->whereIn('cultivation_cycle_id', $cycles->pluck('id'))
+                ->orderByDesc('id')->get()->groupBy('cultivation_cycle_id');
+        }
 
         return view('livewire.greenhouse.cultivation', [
-            'greenhouse' => $greenhouse, 'cycles' => $cycles, 'catalog' => $catalog,
+            'greenhouse' => $greenhouse, 'cycles' => $cycles, 'catalog' => $catalog, 'corrections' => $corrections,
             'zones' => Zone::where('greenhouse_id', $greenhouse->id)->orderBy('code')->get(['id', 'name', 'code']),
         ]);
     }

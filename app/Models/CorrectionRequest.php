@@ -16,11 +16,11 @@ class CorrectionRequest extends Model
 
     public function greenhouse(): BelongsTo
     {
-        return $this->belongsTo(Greenhouse::class);
+        return $this->belongsTo(Greenhouse::class)->withTrashed();
     }
 
     public function cycle(): BelongsTo
     {
-        return $this->belongsTo(CultivationCycle::class, 'cultivation_cycle_id');
+        return $this->belongsTo(CultivationCycle::class, 'cultivation_cycle_id')->withTrashed();
     }
 }

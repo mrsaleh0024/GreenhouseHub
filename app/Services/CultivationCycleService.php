@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Role;
 use App\Models\CultivationCycle;
 use App\Models\Greenhouse;
 use App\Models\User;
@@ -85,6 +86,31 @@ class CultivationCycleService
                 'yield.min' => 'مقدار برداشت نمی‌تواند منفی باشد.',
             ])->validate();
             $locked->forceFill(['harvest_ended_on' => $data['end'], 'total_yield_kg' => $data['yield'] ?? null, 'status' => 'completed'])->save();
+        }, 3);
+    }
+
+    public function correctClosedHarvest(Greenhouse $greenhouse, CultivationCycle $cycle, User $admin, string $endDate, ?string $yieldKg): void
+    {
+        abort_unless($admin->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value]), 403);
+        DB::transaction(function () use ($greenhouse, $cycle, $admin, $endDate, $yieldKg) {
+            $locked = CultivationCycle::whereKey($cycle->id)->where('greenhouse_id', $greenhouse->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($admin)->authorize('update', $locked);
+            if ($locked->harvest_ended_on === null) {
+                throw ValidationException::withMessages(['end_date' => 'این کشت هنوز پایان نیافته است.']);
+            }
+            $referenceDate = $locked->harvest_started_on?->format('Y-m-d') ?? $locked->planting_date->format('Y-m-d');
+            $data = Validator::make(['end_date' => $endDate, 'yield_kg' => $yieldKg], [
+                'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$referenceDate, 'before_or_equal:today'],
+                'yield_kg' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            ], [
+                'end_date.required' => 'تاریخ پایان برداشت را وارد کنید.',
+                'end_date.date_format' => 'تاریخ پایان معتبر نیست.',
+                'end_date.after_or_equal' => 'تاریخ پایان نمی‌تواند پیش از کاشت یا شروع برداشت باشد.',
+                'end_date.before_or_equal' => 'تاریخ پایان نمی‌تواند در آینده باشد.',
+                'yield_kg.numeric' => 'مقدار برداشت باید عدد باشد.',
+                'yield_kg.min' => 'مقدار برداشت نمی‌تواند منفی باشد.',
+            ])->validate();
+            $locked->forceFill(['harvest_ended_on' => $data['end_date'], 'total_yield_kg' => $data['yield_kg'] ?? null])->save();
         }, 3);
     }
 }
