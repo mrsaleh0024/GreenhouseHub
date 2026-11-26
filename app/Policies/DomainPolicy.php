@@ -30,12 +30,12 @@ class DomainPolicy
 
     public function create(User $user): bool
     {
-        return $this->staff($user);
+        return $this->admin($user);
     }
 
     public function update(User $user, Model $model): bool
     {
-        return $this->staff($user);
+        return $this->admin($user);
     }
 
     public function delete(User $user, Model $model): bool
@@ -60,7 +60,8 @@ class DomainPolicy
 
     public function updateContact(User $user, Model $model): bool
     {
-        return $this->staff($user) || $this->view($user, $model);
+        return $this->admin($user)
+            || ($user->hasRole(Role::GreenhouseOwner->value) && $this->view($user, $model));
     }
 
     public function reopen(User $user, Model $model): bool
