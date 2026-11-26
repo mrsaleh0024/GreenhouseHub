@@ -16,6 +16,9 @@ class CultivationCycleService
 {
     public function save(Greenhouse $greenhouse, User $user, array $input, ?CultivationCycle $cycle = null): CultivationCycle
     {
+        if ($cycle === null) {
+            abort_unless($user->hasRole(Role::GreenhouseOwner->value), 403);
+        }
         $allowed = ['zone_id', 'crop_id', 'variety_id', 'substrate_id', 'planting_date', 'expected_harvest_date', 'harvest_started_on', 'plant_count', 'planted_area_m2'];
         if (array_diff(array_keys($input), $allowed) !== []) {
             throw ValidationException::withMessages(['cycle' => 'تغییر اطلاعات کلیدی از این بخش مجاز نیست.']);

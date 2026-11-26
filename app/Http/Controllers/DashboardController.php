@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Role;
+use App\Models\CatalogItem;
+use App\Models\CorrectionRequest;
 use App\Models\Greenhouse;
 use App\Services\GreenhouseCompleteness;
 use Illuminate\Contracts\View\View;
@@ -33,11 +35,16 @@ class DashboardController extends Controller
             }
         }
 
-        return view('dashboard', [
+        $isManager = $user->hasAnyRole([Role::Admin->value, Role::SuperAdmin->value]);
+        $view = $isManager ? 'dashboards.manager' : ($isExpert ? 'dashboards.expert' : 'dashboard');
+
+        return view($view, [
             'records' => $records,
             'isOwner' => $user->hasRole(Role::GreenhouseOwner->value),
             'isExpert' => $isExpert,
             'nextActions' => $nextActions,
+            'pendingCorrections' => $isManager ? CorrectionRequest::where('status', 'pending')->count() : 0,
+            'pendingCatalog' => $isManager ? CatalogItem::where('status', 'pending')->count() : 0,
         ]);
     }
 }

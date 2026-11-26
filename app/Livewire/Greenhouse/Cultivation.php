@@ -81,6 +81,7 @@ class Cultivation extends Component
 
     public function startNew(): void
     {
+        abort_unless(auth()->user()->hasRole(Role::GreenhouseOwner->value), 403);
         Gate::authorize('manageCycles', $this->record());
         $this->resetForm();
         $this->showForm = true;

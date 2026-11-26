@@ -2,7 +2,7 @@
     <a href="{{ route('dashboard') }}" class="text-sm font-semibold text-green-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">→ بازگشت به داشبورد</a>
     <div class="mt-8 flex flex-wrap items-end justify-between gap-5">
         <div><p class="text-xs font-semibold text-green-700">{{ $greenhouse->greenhouse_code }} · {{ $greenhouse->name }}</p><h1 class="mt-3 text-2xl font-bold leading-10 text-gray-900 sm:text-3xl">کشت‌های گلخانه</h1><p class="mt-2 max-w-xl text-sm leading-7 text-gray-600">کشت‌های جاری و سوابق برداشت را یکجا ببینید. هر کشت می‌تواند مربوط به یک ناحیه یا کل گلخانه باشد.</p></div>
-        @can('manageCycles', $greenhouse)<button type="button" wire:click="startNew" class="rounded-xl bg-green-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">+ ثبت کشت جدید</button>@endcan
+        @if (auth()->user()->hasRole('greenhouse_owner'))<button type="button" wire:click="startNew" class="rounded-xl bg-green-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-700">+ ثبت کشت جدید</button>@endif
     </div>
     @if ($notice)<div role="status" class="mt-6 rounded-xl bg-green-50 px-5 py-4 text-sm leading-6 text-green-800">{{ $notice }}</div>@endif
 
