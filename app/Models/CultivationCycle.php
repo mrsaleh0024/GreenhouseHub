@@ -44,4 +44,34 @@ class CultivationCycle extends Model
     {
         return $this->belongsTo(Zone::class);
     }
+
+    public function crop(): BelongsTo
+    {
+        return $this->belongsTo(CatalogItem::class, 'crop_id');
+    }
+
+    public function substrate(): BelongsTo
+    {
+        return $this->belongsTo(CatalogItem::class, 'substrate_id');
+    }
+
+    public function variety(): BelongsTo
+    {
+        return $this->belongsTo(CatalogItem::class, 'variety_id');
+    }
+
+    public function displayStatus(): string
+    {
+        if ($this->status === 'aborted') {
+            return 'متوقف‌شده';
+        }
+        if ($this->harvest_ended_on !== null || $this->status === 'completed') {
+            return 'پایان‌یافته';
+        }
+        if ($this->planting_date?->isFuture()) {
+            return 'در انتظار کاشت';
+        }
+
+        return $this->harvest_started_on ? 'در حال برداشت' : 'در حال رشد';
+    }
 }

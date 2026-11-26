@@ -10,6 +10,7 @@ use App\Livewire\Auth\Register;
 use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Auth\TwoFactorChallenge;
 use App\Livewire\Auth\VerifyMobile;
+use App\Livewire\Greenhouse\Cultivation;
 use App\Livewire\Greenhouse\RecordWizard;
 use App\Livewire\SystemStatus;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     // One shared layout for every role; the menu differs per role (config/navigation.php).
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/greenhouses/{greenhouse}/complete', RecordWizard::class)->name('greenhouses.complete');
+    Route::get('/greenhouses/{greenhouse}/cultivation', Cultivation::class)->name('greenhouses.cultivation');
 
     Route::post('/logout', function (Logout $logout) {
         $logout();
