@@ -6,7 +6,15 @@
 // import focus from '@alpinejs/focus';
 // document.addEventListener('alpine:init', () => window.Alpine.plugin(focus));
 
+import recordPrompts from './record-prompts';
+
 document.addEventListener('alpine:init', () => {
+    window.Alpine.data('recordPrompts', recordPrompts);
+    window.Alpine.data('catalogFilter', () => ({
+        query: '',
+        normalize(value) { return value.normalize('NFKC').replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[\s\u200c]/g, '').toLowerCase(); },
+        matches(label) { return this.normalize(label).includes(this.normalize(this.query)); },
+    }));
     window.Alpine.data('temperatureZone', () => ({
         open: true,
         temp: 22,

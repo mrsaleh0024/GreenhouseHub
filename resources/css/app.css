@@ -15,6 +15,24 @@
     display: none !important;
 }
 
+.workspace-shell {
+    background: linear-gradient(145deg, rgb(var(--theme-white)) 0%, rgb(var(--theme-background) / .5) 65%, rgb(var(--theme-primary) / .045) 100%);
+}
+
+.workspace-shell main { isolation: isolate; }
+.workspace-shell input, .workspace-shell textarea { accent-color: rgb(var(--theme-primary)); }
+.workspace-shell a, .workspace-shell button { -webkit-tap-highlight-color: transparent; }
+.workspace-shell button:focus-visible, .workspace-shell a:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 4px;
+}
+.owner-prompts { box-shadow: 0 18px 45px rgb(var(--theme-primary-dark) / .09); }
+.workspace-shell article { transition: border-color .18s ease; }
+.workspace-shell article:hover { border-color: rgb(var(--theme-primary) / .3); }
+@media (prefers-reduced-motion: reduce) {
+    .workspace-shell *, .workspace-shell *::before, .workspace-shell *::after { transition: none !important; animation: none !important; }
+}
+
 .record-progress {
     height: 0.5rem;
     overflow: hidden;
