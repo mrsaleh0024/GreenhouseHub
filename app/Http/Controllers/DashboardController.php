@@ -23,6 +23,7 @@ class DashboardController extends Controller
         }
         $records = Greenhouse::visibleTo($user)
             ->select($columns)->withCount(['zones', 'cycles'])
+            ->with(['zones' => fn ($query) => $query->select('id', 'greenhouse_id', 'name', 'code', 'area_m2', 'capacity_plants', 'status')->orderBy('id')->limit(6)])
             ->orderByDesc('updated_at')->orderByDesc('id')->paginate(9);
 
         $nextActions = [];

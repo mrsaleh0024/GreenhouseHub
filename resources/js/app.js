@@ -1,3 +1,5 @@
+import catalogFilter from './catalog-filter';
+import formAccordion from './form-accordion';
 // Livewire 3 ships Alpine and starts it for us, so app.js must NOT start a
 // second copy. Instead, register Alpine components/plugins on the instance
 // Livewire exposes, inside the `alpine:init` hook.
@@ -10,11 +12,8 @@ import recordPrompts from './record-prompts';
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('recordPrompts', recordPrompts);
-    window.Alpine.data('catalogFilter', () => ({
-        query: '',
-        normalize(value) { return value.normalize('NFKC').replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[\s\u200c]/g, '').toLowerCase(); },
-        matches(label) { return this.normalize(label).includes(this.normalize(this.query)); },
-    }));
+    window.Alpine.data('catalogFilter', catalogFilter);
+    window.Alpine.data('formAccordion', formAccordion);
     window.Alpine.data('temperatureZone', () => ({
         open: true,
         temp: 22,

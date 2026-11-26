@@ -24,7 +24,7 @@
                     @else
                         <p class="mt-5 border-t border-gray-200 pt-4 text-xs leading-6 text-gray-500">دسترسی شما به اطلاعات این گلخانه فقط برای مشاهده است.</p>
                     @endif
-                </article>
+                <x-zone-overview :greenhouse="$record" mode="owner" /></article>
             @empty
                 <div class="mt-4 rounded-2xl border border-gray-200 bg-white px-6 py-10"><div class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-green-700" aria-hidden="true"><svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11 12 3l9 8v9H3v-9Zm4 0v9m10-9v9M3 14h18" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3 class="mt-5 text-base font-bold text-gray-900">هنوز پرونده‌ای در دسترس نیست</h3><p class="mt-2 max-w-lg text-sm leading-7 text-gray-600">@if ($isOwner) اگر تازه حساب ساخته‌اید، پس از تأیید شماره موبایل پرونده شما به حسابتان متصل می‌شود. اگر همچنان آن را نمی‌بینید با پشتیبانی تماس بگیرید. @else در حال حاضر گلخانه‌ای برای نمایش وجود ندارد. @endif</p></div>
             @endforelse
