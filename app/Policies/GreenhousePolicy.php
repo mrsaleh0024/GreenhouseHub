@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class GreenhousePolicy extends DomainPolicy
 {
+    public function archive(User $user, Model $model): bool
+    {
+        return $this->update($user, $model);
+    }
+
     public function update(User $user, Model $model): bool
     {
         return $this->admin($user)

@@ -25,5 +25,6 @@ class CatalogSeeder extends Seeder
                 }
             }
         }
+        $this->call(IranGeographySeeder::class);
     }
 }

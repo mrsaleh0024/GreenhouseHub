@@ -14,6 +14,7 @@
     font-display:swap
 }
 :root{
+    --danger: #a13838;
     --surface:rgb(var(--theme-white));
     --canvas:color-mix(in srgb, rgb(var(--theme-white)) 68%, rgb(var(--theme-background)));
     --ink:rgb(var(--theme-text));
@@ -33,6 +34,25 @@
     mask:var(--icon-url) center/contain no-repeat;
     -webkit-mask:var(--icon-url) center/contain no-repeat
 }
+.location-choice { min-width: 0; }
+.location-trigger { display:flex; align-items:center; justify-content:space-between; width:100%; padding:14px 18px; border:1px solid var(--line); border-radius:14px; background:var(--surface); text-align:start; }
+.location-trigger small { display:block; color:var(--brand); font-size:11px; margin-bottom:6px; }
+.location-trigger strong { font-size:14px; font-weight:600; }
+.location-trigger:disabled { opacity:.5; cursor:not-allowed; }
+.location-options { border:1px solid var(--line); border-radius:14px; margin-top:6px; background:var(--surface); }
+.location-options fieldset { max-height:240px; overflow:auto; padding:8px; }
+.location-option { display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; font-size:13px; cursor:pointer; }
+.location-option:hover,.location-option:has(input:checked) { background:rgb(var(--theme-primary)/.08); }
+.water-confirm { position:relative; isolation:isolate; overflow:hidden; width:100%; padding:16px; border:1px solid var(--danger); color:var(--danger); border-radius:14px; touch-action:none; user-select:none; -webkit-user-select:none; }
+.water-fill { position:absolute; inset:0; background:var(--danger); transform:translateY(115%); pointer-events:none; }
+.water-fill::before,.water-fill::after { content:''; position:absolute; width:200%; height:20px; top:-10px; left:-50%; background:var(--danger); border-radius:45%; animation:water-wave 1.6s linear infinite paused; }
+.water-fill::after { opacity:.5; top:-15px; animation-direction:reverse; }
+.is-holding.water-confirm { color:var(--surface); }
+.water-confirm > .relative { color:var(--danger); background:var(--surface); border-radius:6px; padding:4px 8px; }
+.is-holding .water-fill { transform:translateY(0); transition:transform 3s linear; }
+.is-holding .water-fill::before,.is-holding .water-fill::after { animation-play-state:running; }
+@keyframes water-wave { to { transform:translateX(12%) rotate(4deg); } }
+@media(prefers-reduced-motion:reduce) { .water-fill::before,.water-fill::after { animation:none; } }
 .workspace-shell{
     background:var(--canvas);
     color:var(--ink)

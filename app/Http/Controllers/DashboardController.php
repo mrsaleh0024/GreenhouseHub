@@ -41,6 +41,7 @@ class DashboardController extends Controller
 
         return view($view, [
             'records' => $records,
+            'archivedRecords' => $isManager ? Greenhouse::onlyTrashed()->select('id', 'name', 'greenhouse_code')->latest('deleted_at')->paginate(10, ['*'], 'archived') : collect(),
             'isOwner' => $user->hasRole(Role::GreenhouseOwner->value),
             'isExpert' => $isExpert,
             'nextActions' => $nextActions,

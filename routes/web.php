@@ -17,6 +17,9 @@ use App\Livewire\Greenhouse\Cultivation;
 use App\Livewire\Greenhouse\RecordWizard;
 use App\Livewire\Greenhouse\Zones;
 use App\Livewire\SystemStatus;
+use App\Models\Greenhouse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', SystemStatus::class)->name('home');
@@ -34,6 +37,13 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'active'])->group(function () {
     // One shared layout for every role; the menu differs per role (config/navigation.php).
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::post('/greenhouses/{id}/restore', function (int $id) {
+        $record = Greenhouse::onlyTrashed()->findOrFail($id);
+        Gate::authorize('restore', $record);
+        $record->restore();
+
+        return new RedirectResponse(route('dashboard'));
+    })->name('greenhouses.restore');
     Route::get('/greenhouses/create', CreateGreenhouse::class)->name('greenhouses.create');
     Route::get('/greenhouses/{greenhouse}/complete', RecordWizard::class)->name('greenhouses.complete');
     Route::get('/greenhouses/{greenhouse}/cultivation', Cultivation::class)->name('greenhouses.cultivation');

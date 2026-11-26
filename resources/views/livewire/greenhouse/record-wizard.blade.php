@@ -29,8 +29,8 @@
                     <h2 class="text-sm font-bold text-gray-900">اصلاح موقعیت اصلی گلخانه</h2>
                     <p class="mt-1 text-xs leading-6 text-gray-600">این اطلاعات کلیدی فقط توسط مدیر قابل اصلاح است.</p>
                     <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                        <div><label for="admin-province" class="block text-sm font-semibold">استان</label><select id="admin-province" wire:model.live="provinceId" class="mt-2 w-full rounded-lg border-gray-300 text-sm"><option value="">انتخاب استان</option>@foreach ($provinces as $province)<option value="{{ $province->id }}">{{ $province->label_fa }}</option>@endforeach</select>@error('province_id')<p role="alert" class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror</div>
-                        <div><label for="admin-city" class="block text-sm font-semibold">شهر</label><select id="admin-city" wire:model="cityId" class="mt-2 w-full rounded-lg border-gray-300 text-sm"><option value="">انتخاب شهر</option>@foreach ($cities as $city)<option value="{{ $city->id }}">{{ $city->label_fa }}</option>@endforeach</select>@error('city_id')<p role="alert" class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror</div>
+                        <x-location-choice :items="$provinces" model="provinceId" label="استان" :value="$provinceId" />
+                        <x-location-choice :items="$cities" model="cityId" label="شهر" :value="$cityId" :disabled="$provinceId === ''" />
                     </div>
                     <button type="button" wire:click="correctLocation" wire:loading.attr="disabled" wire:target="correctLocation" class="mt-4 rounded-lg border border-green-700 px-4 py-2 text-sm font-semibold text-green-700 disabled:opacity-60">ذخیره موقعیت</button>
                 </div>

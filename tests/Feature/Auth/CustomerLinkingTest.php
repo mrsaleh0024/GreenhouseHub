@@ -33,7 +33,7 @@ class CustomerLinkingTest extends TestCase
 
         Livewire::test(Register::class)->set('role', 'greenhouse_owner')->set('name', 'نام فرم')
             ->set('mobile', '09123456789')->set('password', 'Password1')->set('password_confirmation', 'Password1')
-            ->set('greenhouse_name', 'نام جدید')->set('province_id', (string) $province->id)->set('city', 'تهران')
+            ->set('greenhouse_name', 'نام جدید')->set('province_id', (string) $province->id)->set('city', (string) CatalogItem::where('type', 'city')->where('parent_id', $province->id)->where('label_fa', 'تهران')->value('id'))
             ->call('register')->assertHasNoErrors();
         $user = User::where('mobile', '09123456789')->firstOrFail();
         $this->assertFalse($user->customers()->exists());
@@ -62,7 +62,7 @@ class CustomerLinkingTest extends TestCase
         $province = CatalogItem::where('type', 'province')->where('slug', 'tehran')->firstOrFail();
         $registration = fn () => Livewire::test(Register::class)->set('role', 'greenhouse_owner')->set('name', 'مالک آزمون')
             ->set('mobile', '09123456789')->set('password', 'Password1')->set('password_confirmation', 'Password1')
-            ->set('province_id', (string) $province->id)->set('city', 'تهران');
+            ->set('province_id', (string) $province->id)->set('city', (string) CatalogItem::where('type', 'city')->where('parent_id', $province->id)->where('label_fa', 'تهران')->value('id'));
 
         $registration()->set('greenhouse_name', 'نام نخست')->call('register')->assertHasNoErrors();
         $registration()->set('greenhouse_name', 'نام اصلاح‌شده')->call('register')->assertHasNoErrors();

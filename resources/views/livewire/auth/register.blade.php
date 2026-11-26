@@ -48,19 +48,8 @@
                         <x-auth.input label="نام گلخانه" name="greenhouse_name" wire:model="greenhouse_name" />
                     </div>
 
-                    <div>
-                        <label for="province" class="mb-1 block text-sm font-medium text-gray-700">استان</label>
-                        <select id="province" wire:model="province_id"
-                                class="block w-full rounded-lg border-gray-300 px-4 py-2.5 shadow-sm focus:border-green-600 focus:ring-green-600">
-                            <option value="">انتخاب کنید</option>
-                            @foreach ($provinces as $item)
-                                <option value="{{ $item->id }}">{{ $item->label_fa }}</option>
-                            @endforeach
-                        </select>
-                        @error('province_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                    </div>
-
-                    <x-auth.input label="شهر" name="city" wire:model="city" />
+                    <x-location-choice :items="$provinces" model="province_id" label="استان" :value="$province_id" />
+                    <x-location-choice :items="$cities" model="city" label="شهر" :value="$city" :disabled="$province_id === ''" />
                 </div>
             </fieldset>
         @else

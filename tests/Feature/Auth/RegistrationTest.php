@@ -35,7 +35,7 @@ class RegistrationTest extends TestCase
             ->set('password_confirmation', 'Password1')
             ->set('greenhouse_name', 'گلخانه سبز')
             ->set('province_id', CatalogItem::where('type', 'province')->where('slug', 'tehran')->value('id'))
-            ->set('city', 'ورامین');
+            ->set('city', (string) CatalogItem::where('type', 'city')->where('label_fa', 'ورامین')->value('id'));
     }
 
     public function test_registration_page_renders(): void

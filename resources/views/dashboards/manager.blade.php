@@ -10,5 +10,11 @@
             <article class="mt-4 flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-gray-200 bg-white p-6"><div><p class="text-xs text-green-700">{{ $record->greenhouse_code }}</p><h3 class="mt-2 font-bold">{{ $record->name }}</h3><p class="mt-2 text-xs text-gray-500">تکمیل اطلاعات: {{ $record->completeness_percent }}٪</p></div><div class="flex flex-wrap gap-5 text-sm font-semibold text-green-700"><a wire:navigate href="{{ route('greenhouses.complete', $record) }}" class="hover:underline">بررسی و اصلاح پرونده</a><a wire:navigate href="{{ route('greenhouses.cultivation', $record) }}" class="hover:underline">بررسی سوابق کشت</a><a wire:navigate href="{{ route('greenhouses.zones', $record) }}" class="hover:underline">بخش‌ها و تجهیزات</a></div><x-zone-overview :greenhouse="$record" mode="manager" /></article>
         @empty<p class="mt-5 text-gray-600">هنوز پرونده‌ای ثبت نشده است.</p>@endforelse
         <div class="mt-6">{{ $records->links() }}</div>
+        @if ($archivedRecords->isNotEmpty())
+            <section class="mt-10 rounded-2xl border border-gray-200 bg-white p-6"><h2 class="text-xl font-bold">گلخانه‌های حذف‌شده</h2><p class="mt-2 text-sm text-gray-600">بازیابی، پرونده و همه اطلاعات وابسته را دوباره در دسترس مالک قرار می‌دهد.</p>
+                @foreach ($archivedRecords as $archived)<div class="mt-5 flex items-center justify-between gap-4"><span>{{ $archived->name }} · {{ $archived->greenhouse_code }}</span><form method="POST" action="{{ route('greenhouses.restore', $archived->id) }}">@csrf<button class="rounded-xl border border-green-700 px-4 py-2 text-sm text-green-700">بازیابی پرونده</button></form></div>@endforeach
+                {{ $archivedRecords->links() }}
+            </section>
+        @endif
     </div></x-app-layout>
 </div>

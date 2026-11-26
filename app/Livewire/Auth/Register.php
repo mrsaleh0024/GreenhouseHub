@@ -9,7 +9,6 @@ use App\Exceptions\OtpSendException;
 use App\Livewire\Concerns\HasFarsiValidation;
 use App\Models\CatalogItem;
 use App\Models\User;
-use App\Services\CatalogService;
 use App\Services\OtpService;
 use App\Services\OwnerRegistrationService;
 use App\Support\Mobile;
@@ -43,6 +42,11 @@ class Register extends Component
     public string $province_id = '';
 
     public string $city = '';
+
+    public function updatedProvinceId(): void
+    {
+        $this->city = '';
+    }
 
     // Expert
     public string $specialty = '';
@@ -102,7 +106,7 @@ class Register extends Component
 
             if ($role === Role::GreenhouseOwner) {
                 $user->expertProfile()->delete();
-                $city = app(CatalogService::class)->findOrCreateCustom('city', trim($this->city), $user, (int) $this->province_id);
+                $city = CatalogItem::where('type', 'city')->where('status', 'approved')->where('parent_id', $this->province_id)->findOrFail($this->city);
                 app(OwnerRegistrationService::class)->register($user, ['greenhouse_name' => trim($this->greenhouse_name), 'province_id' => (int) $this->province_id, 'city_id' => $city->id]);
             } else {
                 $user->expertProfile()->updateOrCreate([], [
@@ -146,7 +150,7 @@ class Register extends Component
             ? [
                 'greenhouse_name' => ['required', 'string', 'max:120'],
                 'province_id' => ['required', 'integer', Rule::exists('catalog_items', 'id')->where('type', 'province')->where('status', 'approved')],
-                'city' => ['required', 'string', 'max:80'],
+                'city' => ['required', 'integer', Rule::exists('catalog_items', 'id')->where('type', 'city')->where('status', 'approved')->where('parent_id', $this->province_id)],
             ]
             : [
                 'specialty' => ['required', 'string', 'max:120'],
@@ -161,6 +165,7 @@ class Register extends Component
     {
         // The registration card is wider than the other guest screens.
         return view('livewire.auth.register', [
+            'cities' => CatalogItem::where('type', 'city')->where('status', 'approved')->where('parent_id', $this->province_id ?: null)->orderBy('label_fa')->get(),
             'provinces' => CatalogItem::where('type', 'province')->where('status', 'approved')->orderBy('sort_order')->get(),
         ])->layout('layouts.guest', ['maxWidth' => 'max-w-2xl']);
     }
