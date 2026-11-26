@@ -51,6 +51,8 @@ class RecordWizard extends Component
     public function mount(Greenhouse $greenhouse): void
     {
         $this->greenhouseId = $greenhouse->id;
+        $requestedStep = (int) request()->query('step', 1);
+        $this->step = in_array($requestedStep, [1, 2, 3], true) ? $requestedStep : 1;
         $greenhouse = $this->record();
         $this->name = $greenhouse->name;
         foreach (['area_m2', 'address', 'latitude', 'longitude', 'altitude_m', 'structure_type_id', 'cultivation_type_id'] as $field) {
