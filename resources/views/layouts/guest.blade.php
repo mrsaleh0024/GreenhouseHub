@@ -7,19 +7,16 @@
 
         <title>{{ isset($title) ? $title.' | ' : '' }}{{ config('app.name', 'GreenhouseHub') }}</title>
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=vazirmatn:400,500,600,700&display=swap" rel="stylesheet" />
-
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans text-gray-900 antialiased">
         {{-- Tailwind must see both widths: max-w-md max-w-2xl --}}
-        <div class="flex min-h-screen flex-col items-center justify-center bg-gray-100 px-4 py-8">
+        <div class="auth-shell flex min-h-screen flex-col items-center justify-center px-4 py-8">
             <a href="{{ route('home') }}" class="mb-6 text-xl font-bold text-green-700">
                 <x-brand />
             </a>
 
-            <div class="w-full {{ $maxWidth ?? 'max-w-md' }} rounded-xl bg-white p-6 shadow-lg sm:p-8">
+            <div class="auth-card w-full {{ $maxWidth ?? 'max-w-md' }} rounded-xl bg-white p-6 sm:p-8">
                 {{ $slot }}
             </div>
         </div>

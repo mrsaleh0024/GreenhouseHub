@@ -7,13 +7,10 @@
 
         <title>{{ isset($title) ? $title.' | ' : '' }}{{ config('app.name', 'GreenhouseHub') }}</title>
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=vazirmatn:400,500,600,700&display=swap" rel="stylesheet" />
-
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div class="workspace-shell min-h-screen">
+        <div x-data="{ menuOpen: false, collapsed: false, desktop: window.innerWidth >= 1024 }" x-on:resize.window="desktop = window.innerWidth >= 1024; if (desktop) menuOpen = false" x-on:livewire:navigating.window="menuOpen = false" :class="{ 'sidebar-is-collapsed': collapsed }" class="workspace-shell min-h-screen">
             <livewire:layout.navigation />
 
             @isset($header)
@@ -24,7 +21,7 @@
                 </header>
             @endisset
 
-            <main>
+            <main id="main-content" class="workspace-main">
                 {{ $slot }}
             </main>
         </div>
