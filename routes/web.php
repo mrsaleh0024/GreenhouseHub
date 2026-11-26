@@ -13,6 +13,7 @@ use App\Livewire\Auth\TwoFactorChallenge;
 use App\Livewire\Auth\VerifyMobile;
 use App\Livewire\Greenhouse\Cultivation;
 use App\Livewire\Greenhouse\RecordWizard;
+use App\Livewire\Greenhouse\Zones;
 use App\Livewire\SystemStatus;
 use Illuminate\Support\Facades\Route;
 
@@ -33,6 +34,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/greenhouses/{greenhouse}/complete', RecordWizard::class)->name('greenhouses.complete');
     Route::get('/greenhouses/{greenhouse}/cultivation', Cultivation::class)->name('greenhouses.cultivation');
+    Route::get('/greenhouses/{greenhouse}/zones', Zones::class)->name('greenhouses.zones');
     Route::get('/admin/correction-requests', CorrectionInbox::class)->name('admin.corrections');
 
     Route::post('/logout', function (Logout $logout) {
