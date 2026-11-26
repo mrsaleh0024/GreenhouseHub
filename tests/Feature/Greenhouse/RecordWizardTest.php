@@ -58,4 +58,23 @@ class RecordWizardTest extends TestCase
         $this->actingAs($other)->get(route('greenhouses.complete', $greenhouse))->assertNotFound();
         $this->actingAs($expert)->get(route('greenhouses.complete', $greenhouse))->assertForbidden();
     }
+
+    public function test_owner_can_add_a_custom_structure_and_use_it_immediately(): void
+    {
+        $this->withoutVite();
+        $this->seed([RoleSeeder::class, CatalogSeeder::class]);
+        $owner = User::factory()->role(Role::GreenhouseOwner)->create();
+        $customer = Customer::create(['full_name' => 'مشتری', 'mobile' => '09123456789']);
+        $customer->users()->attach($owner);
+        $greenhouse = Greenhouse::create(['customer_id' => $customer->id, 'name' => 'گلخانه']);
+
+        Livewire::actingAs($owner)->test(RecordWizard::class, ['greenhouse' => $greenhouse])
+            ->call('saveAndContinue')->set('customLabels.structure_type', 'سازه اختصاصی')
+            ->call('addCustom', 'structure_type')->assertHasNoErrors()->assertSee('سازه اختصاصی')
+            ->call('saveAndContinue')->assertHasNoErrors();
+
+        $item = CatalogItem::where('type', 'structure_type')->where('label_fa', 'سازه اختصاصی')->firstOrFail();
+        $this->assertSame('pending', $item->status);
+        $this->assertDatabaseHas('greenhouses', ['id' => $greenhouse->id, 'structure_type_id' => $item->id]);
+    }
 }

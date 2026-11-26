@@ -34,12 +34,9 @@ class GreenhouseRecordService
 
         $rules = [];
         foreach (['structure_type_id' => 'structure_type', 'cultivation_type_id' => 'cultivation_type'] as $column => $type) {
-            $rules[$column] = ['nullable', 'integer', Rule::exists('catalog_items', 'id')->where(function ($query) use ($type, $user) {
-                $query->where('type', $type)->where(function ($query) use ($user) {
-                    $query->where('status', 'approved')->orWhere(function ($query) use ($user) {
-                        $query->where('status', 'pending')->where('created_by', $user->id);
-                    });
-                });
+            $rules[$column] = ['nullable', 'integer', Rule::exists('catalog_items', 'id')->where(function ($query) use ($type, $user, $greenhouse, $column) {
+                $query->where('type', $type);
+                CatalogVisibility::constrain($query, $user, array_filter([$greenhouse->{$column}]));
             })];
         }
 

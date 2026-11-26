@@ -17,10 +17,21 @@ class GreenhouseService
         $groups = ['irrigation_type', 'heating_system', 'cooling_system', 'water_source', 'ventilation_system'];
         $ids = [];
         foreach ($idsByGroup as $group => $values) {
-            if (! in_array($group, $groups, true) || ! is_array($values) || count($values) !== count(array_unique($values))) {
+            if (! in_array($group, $groups, true) || ! is_array($values)) {
                 throw ValidationException::withMessages(['options' => 'گزینه‌ها معتبر نیستند.']);
             }
-            $items = CatalogItem::whereIn('id', $values)->where('type', $group)->whereIn('status', ['approved', 'pending'])->get();
+            foreach ($values as $value) {
+                if (! is_int($value) && (! is_string($value) || ! ctype_digit($value))) {
+                    throw ValidationException::withMessages(['options' => 'گزینه‌ها معتبر نیستند.']);
+                }
+            }
+            if (count($values) !== count(array_unique($values))) {
+                throw ValidationException::withMessages(['options' => 'گزینه‌ها معتبر نیستند.']);
+            }
+            $attachedIds = DB::table('greenhouse_options')->where('greenhouse_id', $greenhouse->id)->pluck('catalog_item_id')->all();
+            $query = CatalogItem::whereIn('id', $values)->where('type', $group);
+            CatalogVisibility::constrain($query, $user, $attachedIds);
+            $items = $query->get();
             if ($items->count() !== count($values) || ($items->contains('slug', 'none') && $items->count() > 1)) {
                 throw ValidationException::withMessages(['options' => 'گزینه‌های انتخاب‌شده معتبر نیستند.']);
             }

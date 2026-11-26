@@ -4,11 +4,14 @@ namespace App\Livewire\Greenhouse;
 
 use App\Models\CatalogItem;
 use App\Models\Greenhouse;
+use App\Services\CatalogService;
+use App\Services\CatalogVisibility;
 use App\Services\GreenhouseRecordService;
 use App\Services\GreenhouseService;
 use App\Support\JalaliDate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -47,6 +50,10 @@ class RecordWizard extends Component
     ];
 
     public bool $saved = false;
+
+    public array $customLabels = [];
+
+    public string $customNotice = '';
 
     public function mount(Greenhouse $greenhouse): void
     {
@@ -93,6 +100,7 @@ class RecordWizard extends Component
         }
 
         $this->saved = true;
+        $this->customNotice = '';
         $this->step = min(4, $this->step + 1);
     }
 
@@ -101,7 +109,34 @@ class RecordWizard extends Component
         $this->record();
         $this->resetErrorBag();
         $this->saved = false;
+        $this->customNotice = '';
         $this->step = max(1, $this->step - 1);
+    }
+
+    public function addCustom(string $type, CatalogService $catalog): void
+    {
+        $this->record();
+        $allowed = $this->step === 2 ? ['structure_type', 'cultivation_type'] : ($this->step === 3 ? ['irrigation_type', 'heating_system', 'cooling_system', 'water_source', 'ventilation_system'] : []);
+        $label = $this->customLabels[$type] ?? '';
+        if (! in_array($type, $allowed, true) || ! is_string($label) || ($this->step === 3 && ! is_array($this->options[$type] ?? null))) {
+            throw ValidationException::withMessages(['record' => 'گزینه معتبر نیست.']);
+        }
+        try {
+            $item = $catalog->findOrCreateCustom($type, $label, auth()->user());
+        } catch (ValidationException $exception) {
+            $this->addError('customLabels.'.$type, collect($exception->errors())->flatten()->first());
+
+            return;
+        }
+        if ($type === 'structure_type' || $type === 'cultivation_type') {
+            $this->{$type.'_id'} = (string) $item->id;
+        } else {
+            $noneIds = CatalogItem::where('type', $type)->where('slug', 'none')->pluck('id')->map(fn ($id) => (string) $id)->all();
+            $existing = array_diff($this->options[$type] ?? [], $noneIds);
+            $this->options[$type] = array_values(array_unique([...$existing, (string) $item->id]));
+        }
+        $this->customLabels[$type] = '';
+        $this->customNotice = $item->status === 'pending' ? 'گزینه اضافه شد و پس از ذخیره در پرونده قابل استفاده است؛ مدیر آن را بررسی می‌کند.' : 'گزینه موجود انتخاب شد.';
     }
 
     private function nullable(string $value): ?string
@@ -123,11 +158,11 @@ class RecordWizard extends Component
     {
         $greenhouse = $this->record();
         $types = ['structure_type', 'cultivation_type', 'irrigation_type', 'heating_system', 'cooling_system', 'water_source', 'ventilation_system'];
-        $catalog = CatalogItem::whereIn('type', $types)->where(function ($query) {
-            $query->where('status', 'approved')->orWhere(function ($query) {
-                $query->where('status', 'pending')->where('created_by', auth()->id());
-            });
-        })->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->get()->groupBy('type');
+        $attached = DB::table('greenhouse_options')->where('greenhouse_id', $greenhouse->id)->pluck('catalog_item_id')->all();
+        $attached = array_merge($attached, array_filter([$greenhouse->structure_type_id, $greenhouse->cultivation_type_id]));
+        $query = CatalogItem::whereIn('type', $types);
+        CatalogVisibility::constrain($query, auth()->user(), $attached);
+        $catalog = $query->orderByDesc('is_common')->orderBy('sort_order')->orderBy('label_fa')->get()->groupBy('type');
 
         return view('livewire.greenhouse.record-wizard', ['greenhouse' => $greenhouse, 'catalog' => $catalog]);
     }

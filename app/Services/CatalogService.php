@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\CatalogType;
-use App\Enums\Role;
 use App\Models\CatalogItem;
 use App\Models\User;
 use App\Models\Zone;
@@ -21,15 +20,8 @@ class CatalogService
     public function forPicker(CatalogType $type, User $viewer, ?string $q = null, ?int $parentId = null, int $limit = 50): Collection
     {
         Gate::forUser($viewer)->authorize('viewAny', CatalogItem::class);
-        $staff = $viewer->hasAnyRole([Role::SuperAdmin->value, Role::Admin->value, Role::Expert->value]);
-        $query = CatalogItem::where('type', $type->value)->where(function ($query) use ($viewer, $staff) {
-            $query->where('status', 'approved')->orWhere(function ($query) use ($viewer, $staff) {
-                $query->where('status', 'pending');
-                if (! $staff) {
-                    $query->where('created_by', $viewer->id);
-                }
-            });
-        });
+        $query = CatalogItem::where('type', $type->value);
+        CatalogVisibility::constrain($query, $viewer);
         if ($parentId !== null) {
             $query->where('parent_id', $parentId);
         }
@@ -66,6 +58,10 @@ class CatalogService
                 }
                 $visited[$item->id] = true;
                 $item = $item->mergedInto ?? throw new \LogicException('مقصد ادغام کاتالوگ پیدا نشد.');
+            }
+
+            if ($item->status === 'pending') {
+                CatalogVisibility::rememberClaim($user, $item->id);
             }
 
             return $item;
