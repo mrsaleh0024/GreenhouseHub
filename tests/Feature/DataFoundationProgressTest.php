@@ -21,12 +21,45 @@ class DataFoundationProgressTest extends TestCase
     public function test_catalog_has_farsi_capitals_and_seeding_is_idempotent(): void
     {
         $this->seed(CatalogSeeder::class);
+
+        $cities = json_decode(file_get_contents(database_path('seeders/iran-cities.json')), true, flags: JSON_THROW_ON_ERROR);
+        $provinces = json_decode(file_get_contents(database_path('seeders/iran-provinces.json')), true, flags: JSON_THROW_ON_ERROR);
+        $provinceSources = collect($provinces)->keyBy('id');
+        $provinceItems = CatalogItem::where('type', 'province')->get()->keyBy(fn (CatalogItem $item) => PersianText::normalize($item->label_fa));
+        $seeded = CatalogItem::where('type', 'city')->whereNotNull('source_ref')->get()->keyBy(fn (CatalogItem $item) => (string) $item->source_ref);
         $count = CatalogItem::count();
+
         $this->assertSame(31, CatalogItem::where('type', 'province')->count());
-        $this->assertSame(31, CatalogItem::where('type', 'city')->count());
-        $this->assertDatabaseHas('catalog_items', ['type' => 'city', 'slug' => 'tabriz', 'label_fa' => 'تبریز']);
+        $this->assertCount(count($cities), $seeded);
+        $this->assertSame(count($cities), CatalogItem::where('type', 'city')->count());
+
+        foreach ($cities as $city) {
+            $item = $seeded->get((string) $city['id']);
+            $this->assertNotNull($item, 'Missing source city '.$city['id']);
+            $province = $provinceItems->get(PersianText::normalize($provinceSources->get($city['province_id'])['name']));
+            $this->assertSame($province->id, $item->parent_id, 'Wrong province for source city '.$city['id']);
+            $this->assertSame(PersianText::normalize($city['name']), $item->normalized_label);
+            $this->assertSame('approved', $item->status);
+        }
+
+        $catalog = require database_path('seeders/catalog_data.php');
+        foreach ($catalog['city'] as [$slug, $label]) {
+            $this->assertDatabaseHas('catalog_items', ['type' => 'city', 'slug' => $slug, 'label_fa' => $label]);
+        }
+
+        foreach ([['mazandaran', 'گلوگاه'], ['kerman', 'کشکوییه'], ['kerman', 'علی آباد']] as [$provinceSlug, $label]) {
+            $provinceId = CatalogItem::where('type', 'province')->where('slug', $provinceSlug)->value('id');
+            $this->assertSame(2, CatalogItem::where('type', 'city')->where('parent_id', $provinceId)
+                ->where('normalized_label', PersianText::normalize($label))->count(), $label);
+        }
+
+        $sourceIds = $seeded->pluck('id', 'source_ref')->all();
+
         $this->seed(CatalogSeeder::class);
+
         $this->assertSame($count, CatalogItem::count());
+        $this->assertSame(count($cities), CatalogItem::where('type', 'city')->count());
+        $this->assertSame($sourceIds, CatalogItem::where('type', 'city')->whereNotNull('source_ref')->pluck('id', 'source_ref')->all());
     }
 
     public function test_persian_spelling_variants_normalize_equally(): void

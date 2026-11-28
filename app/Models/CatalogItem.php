@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
 use App\Support\PersianText;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
@@ -13,11 +14,11 @@ class CatalogItem extends Model
 {
     use LogsActivity;
 
-    protected $fillable = ['type', 'parent_id', 'slug', 'label_fa', 'label_en', 'status', 'source', 'is_common', 'sort_order', 'meta', 'created_by'];
+    protected $fillable = ['type', 'parent_id', 'slug', 'source_ref', 'label_fa', 'label_en', 'location_context', 'location_ambiguous', 'status', 'source', 'is_common', 'sort_order', 'meta', 'created_by'];
 
     protected function casts(): array
     {
-        return ['meta' => 'array', 'is_common' => 'boolean', 'reviewed_at' => 'datetime'];
+        return ['meta' => 'array', 'is_common' => 'boolean', 'location_ambiguous' => 'boolean', 'reviewed_at' => 'datetime'];
     }
 
     protected static function booted(): void
@@ -36,7 +37,17 @@ class CatalogItem extends Model
             }
             $m->parent_key = $m->parent_id ?? 0;
             $m->normalized_label = PersianText::normalize($m->label_fa);
+            $m->identity_key = filled($m->source_ref)
+                ? $m->normalized_label.'@'.$m->source_ref
+                : $m->normalized_label;
         });
+    }
+
+    protected function displayLabel(): Attribute
+    {
+        return Attribute::get(fn () => $this->location_context
+            ? $this->label_fa.' ('.$this->location_context.')'
+            : $this->label_fa);
     }
 
     public function parent(): BelongsTo
