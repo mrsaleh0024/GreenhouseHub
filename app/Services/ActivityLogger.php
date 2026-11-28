@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Support\AuditActorContext;
 use App\Models\Activity;
 use App\Models\CultivationCycle;
 use App\Models\Customer;
 use App\Models\Greenhouse;
 use App\Models\User;
 use App\Models\Zone;
+use App\Support\ActivityChangeRedactor;
 use Illuminate\Database\Eloquent\Model;
 
 class ActivityLogger
@@ -19,13 +21,14 @@ class ActivityLogger
             $subject instanceof Zone, $subject instanceof CultivationCycle => $subject->greenhouse()->withTrashed()->first(),
             default => null,
         };
-        $actor ??= auth()->user();
+        $actor ??= app(AuditActorContext::class)->current();
+        $changes = app(ActivityChangeRedactor::class)->redact($subject->getTable(), $changes);
 
         return Activity::create([
             'actor_id' => $actor?->id, 'actor_role' => $actor?->primaryRole()?->value,
             'event' => $event, 'subject_type' => $subject->getMorphClass(), 'subject_id' => $subject->getKey(),
             'customer_id' => $subject instanceof Customer ? $subject->id : $greenhouse?->customer_id,
-            'greenhouse_id' => $greenhouse?->id, 'changes' => $changes ?: null,
+            'greenhouse_id' => $greenhouse?->id, 'changes' => $changes !== [] ? $changes : null,
             'description' => $description, 'ip_address' => app()->runningInConsole() ? null : request()->ip(),
         ]);
     }

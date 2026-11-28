@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Support\AuditActorContext;
 use App\Enums\CatalogType;
 use App\Models\CatalogItem;
 use App\Models\CultivationCycle;
+use App\Models\Customer;
+use App\Models\Greenhouse;
 use App\Models\User;
 use App\Models\Zone;
 use App\Support\PersianText;
@@ -35,53 +38,55 @@ class CatalogService
 
     public function findOrCreateCustom(CatalogType|string $type, string $label, User $user, ?int $parent = null): CatalogItem
     {
-        Gate::forUser($user)->authorize('create', CatalogItem::class);
-        $type = $type instanceof CatalogType ? $type : CatalogType::tryFrom($type);
-        if (! $type || ! $type->isUserCreatable()) {
-            throw ValidationException::withMessages(['type' => 'این فهرست قابل افزودن نیست.']);
-        }
-        $expectedParent = $type->parentType();
-        $parentItem = $parent === null ? null : CatalogItem::whereKey($parent)->where('type', $expectedParent?->value)->first();
-        $attachedParent = $parentItem && $type === CatalogType::Variety && CultivationCycle::visibleTo($user)->where('crop_id', $parentItem->id)->exists();
-        $parentVisible = false;
-        if ($parentItem) {
-            $parentQuery = CatalogItem::whereKey($parentItem->id);
-            CatalogVisibility::constrain($parentQuery, $user, $attachedParent ? [$parentItem->id] : []);
-            $parentVisible = $parentQuery->exists();
-        }
-        if (($expectedParent === null && $parent !== null) || ($expectedParent !== null && (! $parentItem || ! $parentVisible))) {
-            throw ValidationException::withMessages(['parent' => 'مقدار والد معتبر نیست.']);
-        }
-        $label = trim($label);
-        $norm = PersianText::normalize($label);
-        if ($norm === '' || mb_strlen($label) > 150) {
-            throw ValidationException::withMessages(['label' => 'عنوان معتبر نیست.']);
-        }
-        $item = CatalogItem::where(['type' => $type->value, 'parent_key' => $parent ?? 0, 'normalized_label' => $norm])->first();
-        if ($item) {
-            $visited = [];
-            while ($item->status === 'merged') {
-                if (isset($visited[$item->id])) {
-                    throw new \LogicException('زنجیره ادغام کاتالوگ نامعتبر است.');
+        return app(AuditActorContext::class)->run($user, function () use ($type, $label, $user, $parent) {
+            Gate::forUser($user)->authorize('create', CatalogItem::class);
+            $type = $type instanceof CatalogType ? $type : CatalogType::tryFrom($type);
+            if (! $type || ! $type->isUserCreatable()) {
+                throw ValidationException::withMessages(['type' => 'این فهرست قابل افزودن نیست.']);
+            }
+            $expectedParent = $type->parentType();
+            $parentItem = $parent === null ? null : CatalogItem::whereKey($parent)->where('type', $expectedParent?->value)->first();
+            $attachedParent = $parentItem && $type === CatalogType::Variety && CultivationCycle::visibleTo($user)->where('crop_id', $parentItem->id)->exists();
+            $parentVisible = false;
+            if ($parentItem) {
+                $parentQuery = CatalogItem::whereKey($parentItem->id);
+                CatalogVisibility::constrain($parentQuery, $user, $attachedParent ? [$parentItem->id] : []);
+                $parentVisible = $parentQuery->exists();
+            }
+            if (($expectedParent === null && $parent !== null) || ($expectedParent !== null && (! $parentItem || ! $parentVisible))) {
+                throw ValidationException::withMessages(['parent' => 'مقدار والد معتبر نیست.']);
+            }
+            $label = trim($label);
+            $norm = PersianText::normalize($label);
+            if ($norm === '' || mb_strlen($label) > 150) {
+                throw ValidationException::withMessages(['label' => 'عنوان معتبر نیست.']);
+            }
+            $item = CatalogItem::where(['type' => $type->value, 'parent_key' => $parent ?? 0, 'normalized_label' => $norm])->first();
+            if ($item) {
+                $visited = [];
+                while ($item->status === 'merged') {
+                    if (isset($visited[$item->id])) {
+                        throw new \LogicException('زنجیره ادغام کاتالوگ نامعتبر است.');
+                    }
+                    $visited[$item->id] = true;
+                    $item = $item->mergedInto ?? throw new \LogicException('مقصد ادغام کاتالوگ پیدا نشد.');
                 }
-                $visited[$item->id] = true;
-                $item = $item->mergedInto ?? throw new \LogicException('مقصد ادغام کاتالوگ پیدا نشد.');
+
+                if ($item->status === 'pending') {
+                    CatalogVisibility::rememberClaim($user, $item->id);
+                }
+
+                return $item;
             }
-
-            if ($item->status === 'pending') {
-                CatalogVisibility::rememberClaim($user, $item->id);
+            $key = 'catalog-create:'.$user->id;
+            if (RateLimiter::tooManyAttempts($key, 50)) {
+                throw ValidationException::withMessages(['label' => 'تعداد درخواست‌ها بیش از حد مجاز است.']);
             }
+            $created = DB::transaction(fn () => CatalogItem::create(['type' => $type->value, 'parent_id' => $parent, 'slug' => 'custom_'.strtolower(bin2hex(random_bytes(6))), 'label_fa' => $label, 'status' => $type->autoApproves() ? 'approved' : 'pending', 'source' => 'user', 'created_by' => $user->id]));
+            RateLimiter::hit($key, 3600);
 
-            return $item;
-        }
-        $key = 'catalog-create:'.$user->id;
-        if (RateLimiter::tooManyAttempts($key, 50)) {
-            throw ValidationException::withMessages(['label' => 'تعداد درخواست‌ها بیش از حد مجاز است.']);
-        }
-        $created = CatalogItem::create(['type' => $type->value, 'parent_id' => $parent, 'slug' => 'custom_'.strtolower(bin2hex(random_bytes(6))), 'label_fa' => $label, 'status' => $type->autoApproves() ? 'approved' : 'pending', 'source' => 'user', 'created_by' => $user->id]);
-        RateLimiter::hit($key, 3600);
-
-        return $created;
+            return $created;
+        });
     }
 
     public function usageCount(CatalogItem $item): int
@@ -98,35 +103,39 @@ class CatalogService
 
     public function approve(CatalogItem $item, User $admin, ?string $slug = null, ?string $labelEn = null): void
     {
-        Gate::forUser($admin)->authorize('approve', $item);
-        DB::transaction(function () use ($item, $admin, $slug, $labelEn) {
-            $locked = CatalogItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status !== 'pending') {
-                throw ValidationException::withMessages(['item' => 'این گزینه در انتظار بررسی نیست.']);
-            }
-            $values = Validator::make(['slug' => $slug, 'label_en' => $labelEn], [
-                'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:_[a-z0-9]+)*$/', Rule::unique('catalog_items', 'slug')->where('type', $locked->type)->ignore($locked->id)],
-                'label_en' => ['nullable', 'string', 'max:150'],
-            ], [
-                'slug.regex' => 'شناسه انگلیسی باید با حروف کوچک، عدد و زیرخط نوشته شود.',
-                'slug.unique' => 'این شناسه قبلاً در همین فهرست استفاده شده است.',
-                'slug.max' => 'شناسه انگلیسی بیش از حد طولانی است.',
-            ])->validate();
-            $locked->forceFill(['slug' => $values['slug'] ?? $locked->slug, 'label_en' => $values['label_en'] ?? null, 'status' => 'approved', 'reviewed_by' => $admin->id, 'reviewed_at' => now()])->save();
-            app(ActivityLogger::class)->log($locked, 'catalog_approved', actor: $admin);
-        }, 3);
+        app(AuditActorContext::class)->run($admin, function () use ($item, $admin, $slug, $labelEn) {
+            Gate::forUser($admin)->authorize('approve', $item);
+            DB::transaction(function () use ($item, $admin, $slug, $labelEn) {
+                $locked = CatalogItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+                if ($locked->status !== 'pending') {
+                    throw ValidationException::withMessages(['item' => 'این گزینه در انتظار بررسی نیست.']);
+                }
+                $values = Validator::make(['slug' => $slug, 'label_en' => $labelEn], [
+                    'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:_[a-z0-9]+)*$/', Rule::unique('catalog_items', 'slug')->where('type', $locked->type)->ignore($locked->id)],
+                    'label_en' => ['nullable', 'string', 'max:150'],
+                ], [
+                    'slug.regex' => 'شناسه انگلیسی باید با حروف کوچک، عدد و زیرخط نوشته شود.',
+                    'slug.unique' => 'این شناسه قبلاً در همین فهرست استفاده شده است.',
+                    'slug.max' => 'شناسه انگلیسی بیش از حد طولانی است.',
+                ])->validate();
+                $locked->forceFill(['slug' => $values['slug'] ?? $locked->slug, 'label_en' => $values['label_en'] ?? null, 'status' => 'approved', 'reviewed_by' => $admin->id, 'reviewed_at' => now()])->save();
+                app(ActivityLogger::class)->log($locked, 'catalog_approved', actor: $admin);
+            }, 3);
+        });
     }
 
     public function reject(CatalogItem $item, User $admin): void
     {
-        Gate::forUser($admin)->authorize('reject', $item);
-        DB::transaction(function () use ($item) {
-            $locked = CatalogItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status !== 'pending' || $this->usageCount($locked)) {
-                throw ValidationException::withMessages(['item' => 'گزینه مورد استفاده را نمی‌توان حذف کرد؛ در صورت نیاز آن را ادغام کنید.']);
-            }
-            $locked->delete();
-        }, 3);
+        app(AuditActorContext::class)->run($admin, function () use ($item, $admin) {
+            Gate::forUser($admin)->authorize('reject', $item);
+            DB::transaction(function () use ($item) {
+                $locked = CatalogItem::whereKey($item->id)->lockForUpdate()->firstOrFail();
+                if ($locked->status !== 'pending' || $this->usageCount($locked)) {
+                    throw ValidationException::withMessages(['item' => 'گزینه مورد استفاده را نمی‌توان حذف کرد؛ در صورت نیاز آن را ادغام کنید.']);
+                }
+                $locked->delete();
+            }, 3);
+        });
     }
 
     public function equipmentConflicts(CatalogItem $from, CatalogItem $into, User $admin): Collection
@@ -148,17 +157,19 @@ class CatalogService
 
     public function merge(CatalogItem $from, CatalogItem $into, User $admin, array $equipmentResolutions = []): void
     {
-        Gate::forUser($admin)->authorize('merge', $from);
-        DB::transaction(function () use ($from, $into, $admin, $equipmentResolutions) {
-            $locked = CatalogItem::whereIn('id', [$from->id, $into->id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            $source = $locked->get($from->id);
-            $target = $locked->get($into->id);
-            if (! $source || ! $target || $source->is($target) || $source->type !== $target->type || $source->parent_id !== $target->parent_id || $source->status === 'merged' || $target->status === 'merged') {
-                throw ValidationException::withMessages(['item' => 'ادغام این گزینه‌ها مجاز نیست.']);
-            }
+        app(AuditActorContext::class)->run($admin, function () use ($from, $into, $admin, $equipmentResolutions) {
+            Gate::forUser($admin)->authorize('merge', $from);
+            DB::transaction(function () use ($from, $into, $admin, $equipmentResolutions) {
+                $locked = CatalogItem::whereIn('id', [$from->id, $into->id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                $source = $locked->get($from->id);
+                $target = $locked->get($into->id);
+                if (! $source || ! $target || $source->is($target) || $source->type !== $target->type || $source->parent_id !== $target->parent_id || $source->status === 'merged' || $target->status === 'merged') {
+                    throw ValidationException::withMessages(['item' => 'ادغام این گزینه‌ها مجاز نیست.']);
+                }
 
-            $this->mergePair($source, $target, $admin, $equipmentResolutions);
-        }, 3);
+                $this->mergePair($source, $target, $admin, $equipmentResolutions);
+            }, 3);
+        });
     }
 
     private function mergePair(CatalogItem $from, CatalogItem $into, User $admin, array $equipmentResolutions): void
@@ -179,8 +190,7 @@ class CatalogService
             }
         }
 
-        $duplicates = DB::table('greenhouse_options')->where('catalog_item_id', $into->id)->pluck('greenhouse_id');
-        DB::table('greenhouse_options')->where('catalog_item_id', $from->id)->whereIn('greenhouse_id', $duplicates)->delete();
+        $this->mergeGreenhouseOptions($from, $into, $admin);
 
         foreach ($this->equipmentConflicts($from, $into, $admin) as $conflict) {
             if (! array_key_exists($conflict->zone_id, $equipmentResolutions)) {
@@ -203,14 +213,209 @@ class CatalogService
             ], actor: $admin);
         }
 
-        foreach (CatalogReferences::COLUMNS as $table => $columns) {
-            foreach ($columns as $column) {
-                if ($table !== 'catalog_items' || $column !== 'parent_id') {
-                    DB::table($table)->where($column, $from->id)->update([$column => $into->id]);
-                }
-            }
-        }
+        $this->mergeRemainingEquipment($from, $into, $admin);
+        $this->mergeModelReferences($from, $into);
         $from->forceFill(['status' => 'merged', 'merged_into_id' => $into->id, 'reviewed_by' => $admin->id, 'reviewed_at' => now()])->save();
         app(ActivityLogger::class)->log($from, 'catalog_merged', ['merged_into_id' => ['old' => null, 'new' => $into->id]], actor: $admin);
+    }
+
+    /**
+     * Merge greenhouse option references and record their before/after
+     * catalog IDs, including duplicate option removal.
+     */
+    private function mergeGreenhouseOptions(
+        CatalogItem $from,
+        CatalogItem $into,
+        User $admin,
+    ): void {
+        $greenhouseIds = DB::table('greenhouse_options')
+            ->where('catalog_item_id', $from->id)
+            ->orderBy('greenhouse_id')
+            ->pluck('greenhouse_id');
+
+        foreach ($greenhouseIds as $greenhouseId) {
+            $greenhouse = Greenhouse::withTrashed()
+                ->whereKey($greenhouseId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $snapshot = fn (): array => DB::table('greenhouse_options')
+                ->join(
+                    'catalog_items',
+                    'catalog_items.id',
+                    '=',
+                    'greenhouse_options.catalog_item_id',
+                )
+                ->where('greenhouse_options.greenhouse_id', $greenhouseId)
+                ->where('catalog_items.type', $from->type)
+                ->orderBy('catalog_items.id')
+                ->pluck('catalog_items.id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $before = $snapshot();
+
+            $source = DB::table('greenhouse_options')
+                ->where('greenhouse_id', $greenhouseId)
+                ->where('catalog_item_id', $from->id);
+
+            if (! $source->exists()) {
+                continue;
+            }
+
+            $targetExists = DB::table('greenhouse_options')
+                ->where('greenhouse_id', $greenhouseId)
+                ->where('catalog_item_id', $into->id)
+                ->exists();
+
+            if ($targetExists) {
+                $source->delete();
+            } else {
+                $source->update([
+                    'catalog_item_id' => $into->id,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $after = $snapshot();
+
+            if ($before !== $after) {
+                app(ActivityLogger::class)->log(
+                    $greenhouse,
+                    'options_changed',
+                    [
+                        'options' => [
+                            'old' => [$from->type => $before],
+                            'new' => [$from->type => $after],
+                        ],
+                    ],
+                    actor: $admin,
+                );
+            }
+        }
+    }
+
+    /**
+     * Conflicting equipment is handled by mergePair().
+     * Record the remaining non-conflicting equipment replacements.
+     */
+    private function mergeRemainingEquipment(
+        CatalogItem $from,
+        CatalogItem $into,
+        User $admin,
+    ): void {
+        DB::table('zone_equipment')
+            ->where('equipment_id', $from->id)
+            ->lockForUpdate()
+            ->chunkById(200, function ($rows) use ($from, $into, $admin) {
+                foreach ($rows as $row) {
+                    $zone = Zone::withTrashed()
+                        ->whereKey($row->zone_id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    $affected = DB::table('zone_equipment')
+                        ->where('id', $row->id)
+                        ->where('equipment_id', $from->id)
+                        ->update([
+                            'equipment_id' => $into->id,
+                            'updated_at' => now(),
+                        ]);
+
+                    if ($affected !== 1) {
+                        throw new \LogicException(
+                            'Equipment reference changed during catalog merge.'
+                        );
+                    }
+
+                    app(ActivityLogger::class)->log(
+                        $zone,
+                        'equipment_changed',
+                        [
+                            'equipment' => [
+                                'old' => [[
+                                    'equipment_id' => $from->id,
+                                    'quantity' => (int) $row->quantity,
+                                    'notes' => $row->notes,
+                                ]],
+                                'new' => [[
+                                    'equipment_id' => $into->id,
+                                    'quantity' => (int) $row->quantity,
+                                    'notes' => $row->notes,
+                                ]],
+                            ],
+                        ],
+                        actor: $admin,
+                    );
+                }
+            });
+    }
+
+    /**
+     * Repoint model references through Eloquent so model events,
+     * actor tracking and activity logging are not bypassed.
+     *
+     * Archived records must also retain a complete audit trail.
+     */
+    private function mergeModelReferences(
+        CatalogItem $from,
+        CatalogItem $into,
+    ): void {
+        $models = [
+            'customers' => Customer::class,
+            'greenhouses' => Greenhouse::class,
+            'zones' => Zone::class,
+            'cultivation_cycles' => CultivationCycle::class,
+            'catalog_items' => CatalogItem::class,
+        ];
+
+        foreach (CatalogReferences::COLUMNS as $table => $columns) {
+            if (in_array(
+                $table,
+                ['greenhouse_options', 'zone_equipment'],
+                true,
+            )) {
+                continue;
+            }
+
+            $model = $models[$table] ?? throw new \LogicException(
+                'Unregistered catalog reference table.'
+            );
+
+            foreach ($columns as $column) {
+                if (
+                    $table === 'catalog_items'
+                    && $column === 'parent_id'
+                ) {
+                    continue;
+                }
+
+                $query = $model::query();
+
+                if ($table !== 'catalog_items') {
+                    $query->withTrashed();
+                }
+
+                $query
+                    ->where($column, $from->id)
+                    ->lockForUpdate()
+                    ->chunkById(200, function ($records) use (
+                        $column,
+                        $into
+                    ) {
+                        foreach ($records as $record) {
+                            $record->forceFill([
+                                $column => $into->id,
+                            ]);
+
+                            if (! $record->save()) {
+                                throw new \LogicException(
+                                    'Catalog reference could not be saved.'
+                                );
+                            }
+                        }
+                    });
+            }
+        }
     }
 }

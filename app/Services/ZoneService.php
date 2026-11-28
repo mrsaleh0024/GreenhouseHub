@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\AuditActorContext;
 use App\Models\Greenhouse;
 use App\Models\User;
 use App\Models\Zone;
@@ -15,36 +16,38 @@ class ZoneService
 {
     public function save(Greenhouse $greenhouse, User $user, array $input, ?Zone $zone = null): Zone
     {
-        if (array_diff(array_keys($input), ['name', 'zone_type_id', 'area_m2', 'capacity_plants']) !== []) {
-            throw ValidationException::withMessages(['zone' => 'تغییر اطلاعات کلیدی از این بخش مجاز نیست.']);
-        }
-
-        return DB::transaction(function () use ($greenhouse, $user, $input, $zone) {
-            $lockedGreenhouse = Greenhouse::whereKey($greenhouse->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($user)->authorize('manageZones', $lockedGreenhouse);
-            if ($zone) {
-                $zone = Zone::whereKey($zone->id)->where('greenhouse_id', $lockedGreenhouse->id)->lockForUpdate()->firstOrFail();
-                Gate::forUser($user)->authorize('update', $zone);
+        return app(AuditActorContext::class)->run($user, function () use ($greenhouse, $user, $input, $zone) {
+            if (array_diff(array_keys($input), ['name', 'zone_type_id', 'area_m2', 'capacity_plants']) !== []) {
+                throw ValidationException::withMessages(['zone' => 'تغییر اطلاعات کلیدی از این بخش مجاز نیست.']);
             }
-            $data = Validator::make($input, [
-                'name' => ['required', 'string', 'max:120'],
-                'zone_type_id' => ['nullable', 'integer', Rule::exists('catalog_items', 'id')->where(function ($query) use ($user, $zone) {
-                    $query->where('type', 'zone_type');
-                    CatalogVisibility::constrain($query, $user, array_filter([$zone?->zone_type_id]));
-                })],
-                'area_m2' => ['nullable', 'numeric', 'gt:0', 'max:99999999.99'],
-                'capacity_plants' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
-            ], [
-                'name.required' => 'نام ناحیه را وارد کنید.', 'name.max' => 'نام ناحیه بیش از حد طولانی است.',
-                'zone_type_id.exists' => 'نوع ناحیه معتبر نیست.', 'area_m2.numeric' => 'مساحت باید عدد باشد.',
-                'area_m2.gt' => 'مساحت باید بزرگ‌تر از صفر باشد.', 'capacity_plants.integer' => 'ظرفیت باید عدد صحیح باشد.',
-                'capacity_plants.min' => 'ظرفیت باید دست‌کم یک بوته باشد.',
-            ])->validate();
-            $zone ??= new Zone(['greenhouse_id' => $lockedGreenhouse->id]);
-            $zone->fill($data)->save();
 
-            return $zone;
-        }, 3);
+            return DB::transaction(function () use ($greenhouse, $user, $input, $zone) {
+                $lockedGreenhouse = Greenhouse::whereKey($greenhouse->id)->lockForUpdate()->firstOrFail();
+                Gate::forUser($user)->authorize('manageZones', $lockedGreenhouse);
+                if ($zone) {
+                    $zone = Zone::whereKey($zone->id)->where('greenhouse_id', $lockedGreenhouse->id)->lockForUpdate()->firstOrFail();
+                    Gate::forUser($user)->authorize('update', $zone);
+                }
+                $data = Validator::make($input, [
+                    'name' => ['required', 'string', 'max:120'],
+                    'zone_type_id' => ['nullable', 'integer', Rule::exists('catalog_items', 'id')->where(function ($query) use ($user, $zone) {
+                        $query->where('type', 'zone_type');
+                        CatalogVisibility::constrain($query, $user, array_filter([$zone?->zone_type_id]));
+                    })],
+                    'area_m2' => ['nullable', 'numeric', 'gt:0', 'max:99999999.99'],
+                    'capacity_plants' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
+                ], [
+                    'name.required' => 'نام ناحیه را وارد کنید.', 'name.max' => 'نام ناحیه بیش از حد طولانی است.',
+                    'zone_type_id.exists' => 'نوع ناحیه معتبر نیست.', 'area_m2.numeric' => 'مساحت باید عدد باشد.',
+                    'area_m2.gt' => 'مساحت باید بزرگ‌تر از صفر باشد.', 'capacity_plants.integer' => 'ظرفیت باید عدد صحیح باشد.',
+                    'capacity_plants.min' => 'ظرفیت باید دست‌کم یک بوته باشد.',
+                ])->validate();
+                $zone ??= new Zone(['greenhouse_id' => $lockedGreenhouse->id]);
+                $zone->fill($data)->save();
+
+                return $zone;
+            }, 3);
+        });
     }
 
     public function syncEquipment(Zone $zone, User $user, array $rows): void
@@ -82,7 +85,7 @@ class ZoneService
             foreach ($new as $item) {
                 DB::table('zone_equipment')->insert($item + ['zone_id' => $locked->id, 'created_at' => now(), 'updated_at' => now()]);
             }
-            app(ActivityLogger::class)->log($locked, 'equipment_changed', ['equipment' => ['old' => $old, 'new' => $new]]);
+            app(ActivityLogger::class)->log($locked, 'equipment_changed', ['equipment' => ['old' => $old, 'new' => $new]], actor: $user);
         }, 3);
     }
 }

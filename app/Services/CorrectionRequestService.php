@@ -34,7 +34,7 @@ class CorrectionRequestService
             $request = new CorrectionRequest(['greenhouse_id' => $greenhouse->id, 'cultivation_cycle_id' => $cycle?->id, 'details' => trim($details)]);
             $request->requested_by = $owner->id;
             $request->save();
-            app(ActivityLogger::class)->log($greenhouse, 'correction_requested');
+            app(ActivityLogger::class)->log($greenhouse, 'correction_requested', actor: $owner);
 
             return $request;
         });
@@ -54,7 +54,7 @@ class CorrectionRequestService
                 throw ValidationException::withMessages(['resolution' => 'این درخواست پیش‌تر بررسی شده است.']);
             }
             $locked->forceFill(['status' => 'resolved', 'resolution' => trim($resolution), 'resolved_by' => $admin->id, 'resolved_at' => now()])->save();
-            app(ActivityLogger::class)->log($locked->greenhouse, 'correction_resolved');
+            app(ActivityLogger::class)->log($locked->greenhouse, 'correction_resolved', actor: $admin);
         });
     }
 }

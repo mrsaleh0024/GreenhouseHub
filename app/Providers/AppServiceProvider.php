@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\AuditActorContext;
 use App\Enums\Role;
 use App\Models\Activity;
 use App\Models\CatalogItem;
@@ -27,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->scoped(AuditActorContext::class);
+
         // To add sms.ir later: create SmsIrGateway implementing SmsGateway
         // and add a 'smsir' => new SmsIrGateway(...) arm below.
         $this->app->bind(SmsGateway::class, fn () => match (config('sms.driver')) {
@@ -37,8 +40,20 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // The super admin passes every gate/policy check.
-        Gate::before(fn (User $user) => $user->hasRole(Role::SuperAdmin->value) ? true : null);
+        // Audit records are read-only, including for super administrators.
+        // All other domain permissions retain the existing behaviour.
+        Gate::before(function (User $user, string $ability, array $arguments = []): ?bool {
+            $target = $arguments[0] ?? null;
+
+            if (
+                ($target === Activity::class || $target instanceof Activity)
+                && ! in_array($ability, ['viewAny', 'view'], true)
+            ) {
+                return false;
+            }
+
+            return $user->hasRole(Role::SuperAdmin->value) ? true : null;
+        });
         Relation::morphMap(['customer' => Customer::class, 'greenhouse' => Greenhouse::class, 'zone' => Zone::class, 'cultivation_cycle' => CultivationCycle::class, 'catalog_item' => CatalogItem::class]);
         Gate::policy(Greenhouse::class, GreenhousePolicy::class);
         Gate::policy(Zone::class, ZonePolicy::class);

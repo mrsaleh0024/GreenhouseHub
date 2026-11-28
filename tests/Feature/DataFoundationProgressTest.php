@@ -70,17 +70,14 @@ class DataFoundationProgressTest extends TestCase
 
     public function test_all_new_columns_are_classified(): void
     {
-        foreach (config('data_classification') as $table => $columns) {
-            if ($table === 'users') {
-                continue;
-            }
+        foreach (config('data_classification.tables') as $table => $columns) {
             $actual = Schema::getColumnListing($table);
             $classified = array_keys($columns);
             sort($actual);
             sort($classified);
             $this->assertSame($actual, $classified, $table);
             foreach ($columns as $classification) {
-                $this->assertContains($classification, ['safe', 'internal', 'pii']);
+                $this->assertContains($classification, ['safe', 'internal', 'pii', 'credential']);
             }
         }
     }

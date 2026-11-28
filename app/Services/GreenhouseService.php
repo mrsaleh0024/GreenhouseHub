@@ -45,8 +45,8 @@ class GreenhouseService
             foreach ($ids as $group => $groupIds) {
                 $current = DB::table('greenhouse_options')->join('catalog_items', 'catalog_items.id', '=', 'greenhouse_options.catalog_item_id')
                     ->where('greenhouse_id', $locked->id)->where('catalog_items.type', $group)
-                    ->orderBy('catalog_items.slug')->pluck('catalog_items.slug')->all();
-                $selected = CatalogItem::whereIn('id', $groupIds)->orderBy('slug')->pluck('slug')->all();
+                    ->orderBy('catalog_items.id')->pluck('catalog_items.id')->map(fn ($id) => (int) $id)->all();
+                $selected = CatalogItem::whereIn('id', $groupIds)->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
                 if ($current === $selected) {
                     continue;
                 }
@@ -59,7 +59,7 @@ class GreenhouseService
                 }
             }
             if ($old !== []) {
-                app(ActivityLogger::class)->log($locked, 'options_changed', ['options' => ['old' => $old, 'new' => $new]]);
+                app(ActivityLogger::class)->log($locked, 'options_changed', ['options' => ['old' => $old, 'new' => $new]], actor: $user);
                 app(GreenhouseCompleteness::class)->update($locked);
             }
         });
